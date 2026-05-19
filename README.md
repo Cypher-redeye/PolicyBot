@@ -9,7 +9,6 @@ policybot/
 ├── backend/
 │   ├── main.py                  # entry point, starts the FastAPI server
 │   ├── requirements.txt
-│   ├── .env                     # environment variables (DB, API keys, etc.)
 │   └── app/
 │       ├── app.py               # FastAPI app instance, registers routers
 │       ├── database.py          # SQLAlchemy engine, session setup (PostgreSQL)
