@@ -1,0 +1,28 @@
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+pydantic>=2.6.0
+pydantic-settings>=2.2.0
+python-dotenv>=1.0.0
+python-multipart>=0.0.9
+passlib[bcrypt]>=1.7.4
+pyjwt>=2.8.0
+bcrypt>=4.0.0
+
+# RAG & Embeddings
+chromadb>=0.4.0
+langchain>=0.1.0
+langchain-openai>=0.1.0
+langchain-community>=0.0.20
+langchain-chroma>=0.1.0
+rank-bm25>=0.2.2
+neo4j>=5.15.0
+
+# Utilities & Testing
+pymysql>=1.1.0
+cryptography>=41.0.0
+pypdf>=3.0.0
+pytest>=7.4.0
+pytest-asyncio>=0.23.0
+testcontainers[neo4j]>=4.0.0
