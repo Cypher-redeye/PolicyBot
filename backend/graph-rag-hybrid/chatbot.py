@@ -96,7 +96,7 @@ class ChatBot:
     
     def _clear_history(self):
         self.conversation_history = []
-        print("\n✓ Conversation history cleared\n")
+        print("\n[OK] Conversation history cleared\n")
     
     def chat(self, user_input: str) -> Optional[Dict]:
         if self.process_command(user_input):

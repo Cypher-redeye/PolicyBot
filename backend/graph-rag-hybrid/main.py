@@ -27,40 +27,40 @@ def setup_documents(rag_system: DocumentRAGSystem):
         path_obj = Path(directory_path)
         
         if not path_obj.exists():
-            print("❌ Path not found!")
+            print("[ERROR] Path not found!")
         elif path_obj.is_file():
-            print(f"❌ Error: The path '{directory_path}' is a file, not a directory!")
-            print(f"💡 Tip: If you want to add a single file, please use option 2 (Add a single file)")
+            print(f"[ERROR] Error: The path '{directory_path}' is a file, not a directory!")
+            print(f"[TIP] Tip: If you want to add a single file, please use option 2 (Add a single file)")
         elif path_obj.is_dir():
             extensions_input = input("Enter file extensions (comma-separated, e.g., txt,md,pdf) or press Enter for default: ").strip()
             extensions = [f".{ext.strip()}" for ext in extensions_input.split(",")] if extensions_input else None
             try:
                 rag_system.add_directory(directory_path, extensions)
-                print("✓ Documents added successfully!")
+                print("[OK] Documents added successfully!")
             except Exception as e:
-                print(f"❌ Error: {e}")
-                print("💡 Tip: Make sure the directory contains files with the specified extensions")
+                print(f"[ERROR] Error: {e}")
+                print("[TIP] Tip: Make sure the directory contains files with the specified extensions")
         else:
-            print("❌ Invalid path!")
+            print("[ERROR] Invalid path!")
     
     elif choice == "2":
         file_path = input("Enter file path: ").strip()
         path_obj = Path(file_path)
         
         if not path_obj.exists():
-            print("❌ File not found!")
+            print("[ERROR] File not found!")
         elif path_obj.is_dir():
-            print(f"❌ Error: The path '{file_path}' is a directory, not a file!")
-            print(f"💡 Tip: If you want to add multiple files from a directory, please use option 1 (Add documents from a directory)")
+            print(f"[ERROR] Error: The path '{file_path}' is a directory, not a file!")
+            print(f"[TIP] Tip: If you want to add multiple files from a directory, please use option 1 (Add documents from a directory)")
         elif path_obj.is_file():
             try:
                 rag_system.add_file(file_path)
-                print("✓ File added successfully!")
+                print("[OK] File added successfully!")
             except Exception as e:
-                print(f"❌ Error: {e}")
-                print("💡 Tip: Make sure the file is readable and in a supported format")
+                print(f"[ERROR] Error: {e}")
+                print("[TIP] Tip: Make sure the file is readable and in a supported format")
         else:
-            print("❌ Invalid path!")
+            print("[ERROR] Invalid path!")
     
     elif choice == "3":
         print("Enter your text (press Enter twice to finish):")
@@ -81,9 +81,9 @@ def setup_documents(rag_system: DocumentRAGSystem):
             doc_name = input("Enter document name (optional): ").strip() or "user_input.txt"
             metadata = [{"name": doc_name, "type": "text"}]
             rag_system.add_documents([text], metadata)
-            print("✓ Text added successfully!")
+            print("[OK] Text added successfully!")
         else:
-            print("❌ No text provided!")
+            print("[ERROR] No text provided!")
     
     elif choice == "4":
         print("Skipping document setup...")
@@ -93,12 +93,12 @@ def setup_documents(rag_system: DocumentRAGSystem):
         sys.exit(0)
     
     else:
-        print("❌ Invalid choice!")
+        print("[ERROR] Invalid choice!")
 
 
 def main():
     print("\n" + "="*60)
-    print("🤖 RAG CHATBOT SYSTEM")
+    print("RAG CHATBOT SYSTEM")
     print("="*60)
     print("\nInitializing system...")
     
@@ -107,7 +107,7 @@ def main():
     try:
         rag_system = DocumentRAGSystem(config)
     except Exception as e:
-        print(f"\n❌ Error initializing RAG system: {e}")
+        print(f"\n[ERROR] Error initializing RAG system: {e}")
         print("\nPlease check:")
         print("  - MySQL connection settings in config.py")
         print("  - Azure OpenAI credentials")
@@ -121,16 +121,16 @@ def main():
         rag_system.close()
         sys.exit(0)
     except Exception as e:
-        print(f"\n❌ Error during document setup: {e}")
+        print(f"\n[ERROR] Error during document setup: {e}")
     
     try:
         chatbot = ChatBot(rag_system)
         chatbot.run_interactive()
     except Exception as e:
-        print(f"\n❌ Error running chatbot: {e}")
+        print(f"\n[ERROR] Error running chatbot: {e}")
     finally:
         rag_system.close()
-        print("✓ System closed successfully")
+        print("[OK] System closed successfully")
 
 
 if __name__ == "__main__":
