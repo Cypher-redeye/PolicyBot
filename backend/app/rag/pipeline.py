@@ -1,7 +1,7 @@
 import sys
 import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../graph-rag-hybrid"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../graph-rag-hybrid"))
 
 from rag_system import DocumentRAGSystem
 from config import RAGConfig
