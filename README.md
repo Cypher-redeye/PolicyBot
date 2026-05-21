@@ -5,56 +5,65 @@ A RAG-based policy assistant with a FastAPI backend and React frontend.
 ## Project Structure
 
 ```
-policybot/
+PolicyBot/
 ├── backend/
 │   ├── main.py                  # entry point, starts the FastAPI server
 │   ├── requirements.txt
-│   └── app/
-│       ├── app.py               # FastAPI app instance, registers routers
-│       ├── database.py          # SQLAlchemy engine, session setup (PostgreSQL)
-│       ├── routers/
-│       │   ├── auth.py          # login, register, token endpoints
-│       │   ├── documents.py     # upload, list, delete policy documents
-│       │   └── query.py         # RAG query endpoint
-│       ├── models/
-│       │   ├── user.py          # SQLAlchemy User table
-│       │   └── document.py      # SQLAlchemy Document table
-│       ├── schemas/
-│       │   ├── user.py          # Pydantic schemas for user request/response
-│       │   └── document.py      # Pydantic schemas for document request/response
-│       ├── services/
-│       │   ├── auth_service.py      # user creation, login logic
-│       │   └── document_service.py  # document processing and storage logic
-│       ├── rag/
-│       │   ├── pipeline.py      # orchestrates retrieval + LLM generation
-│       │   ├── embeddings.py    # generates embeddings for documents
-│       │   └── retriever.py     # queries vector DB for relevant chunks
-│       └── core/
-│           ├── config.py        # app settings via pydantic-settings
-│           ├── security.py      # JWT creation, password hashing
-│           └── dependencies.py  # shared FastAPI Depends() (e.g. get_db, get_current_user)
+│   ├── uploads/                 # uploaded policy documents
+│   ├── app/
+│   │   ├── app.py               # FastAPI app instance, CORS, registers routers
+│   │   ├── database.py          # SQLAlchemy engine + session (PostgreSQL)
+│   │   ├── routers/
+│   │   │   ├── auth.py          # register, login endpoints
+│   │   │   ├── documents.py     # upload, list, delete policy documents
+│   │   │   └── query.py         # RAG query endpoint
+│   │   ├── models/
+│   │   │   ├── user.py          # User table
+│   │   │   └── document.py      # Document table
+│   │   ├── schemas/
+│   │   │   ├── user.py          # Pydantic schemas for auth
+│   │   │   └── document.py      # Pydantic schemas for documents
+│   │   ├── services/
+│   │   │   ├── auth_service.py      # register, login logic
+│   │   │   └── document_service.py  # file storage + RAG ingestion
+│   │   ├── rag/
+│   │   │   └── pipeline.py      # bridge to graph-rag-hybrid system
+│   │   └── core/
+│   │       ├── config.py        # all settings via pydantic-settings
+│   │       ├── security.py      # JWT, password hashing
+│   │       └── dependencies.py  # get_db, get_current_user
+│   └── graph-rag-hybrid/        # RAG engine
+│       ├── rag_system.py        # orchestrator wiring all retrievers
+│       ├── document_processor.py # chunking + chunk_id assignment
+│       ├── hybrid_retriever.py  # parallel fan-out + RRF fusion
+│       ├── bm25_retriever.py    # BM25 sparse retriever
+│       ├── graph_store.py       # Neo4j connection + Cypher queries
+│       ├── graph_extractor.py   # LLM-based entity/relation extraction
+│       ├── logger.py            # MySQL session/query logging
+│       ├── config.py            # RAG-specific settings
+│       └── tests/               # unit + integration tests
 │
 └── frontend/
     └── src/
         ├── pages/
-        │   ├── Home.jsx         # landing page
-        │   ├── Login.jsx        # login/register page
-        │   └── Dashboard.jsx    # main chat + document management UI
+        │   ├── Home.jsx
+        │   ├── Login.jsx
+        │   └── Dashboard.jsx
         ├── components/
-        │   ├── Chat/            # chat interface components
-        │   ├── Documents/       # document upload and list components
-        │   └── Auth/            # login/register form components
+        │   ├── Chat/
+        │   ├── Documents/
+        │   └── Auth/
         ├── context/
-        │   └── AuthContext.jsx  # global auth state (user, token)
+        │   └── AuthContext.jsx
         ├── services/
-        │   └── api.js           # axios instance, all API call functions
-        ├── App.jsx              # routes setup
-        └── main.jsx             # React entry point
+        │   └── api.js
+        ├── App.jsx
+        └── main.jsx
 ```
 
 ## Tech Stack
 
 - **Backend** — FastAPI, SQLAlchemy, PostgreSQL
-- **RAG** — LangChain / LlamaIndex, vector DB, LLM
+- **RAG** — LangChain, ChromaDB, Neo4j, BM25, Azure OpenAI (gpt-4o)
 - **Frontend** — React (Vite)
 - **Auth** — JWT
