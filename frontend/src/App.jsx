@@ -20,27 +20,6 @@ import {
 function ProtectedLayout({ children }) {
   const { token, user, logout, loading } = useAuth();
   const navigate = useNavigate();
-  const [telemetryLogs, setTelemetryLogs] = useState(() => {
-    const stored = localStorage.getItem('policybot_telemetry_logs');
-    return stored ? JSON.parse(stored).slice(0, 4) : [
-      "[SYS: OK] Node Core Ready",
-      "[DB: OK] Connected SQLite Fallback",
-      "[RAG: SYN] Vector schema hydrated"
-    ];
-  });
-
-  useEffect(() => {
-    function loadLogs() {
-      const stored = localStorage.getItem('policybot_telemetry_logs');
-      if (stored) {
-        setTelemetryLogs(JSON.parse(stored).slice(0, 4));
-      }
-    }
-    window.addEventListener('policybot_new_api_log', loadLogs);
-    return () => {
-      window.removeEventListener('policybot_new_api_log', loadLogs);
-    };
-  }, []);
 
   if (loading) {
     return (
@@ -51,10 +30,11 @@ function ProtectedLayout({ children }) {
         justifyContent: 'center',
         backgroundColor: 'var(--bg-darker)',
         color: 'var(--accent-gold)',
-        fontFamily: 'monospace',
-        fontSize: '1rem'
+        fontFamily: 'Inter, sans-serif',
+        fontSize: '1rem',
+        fontWeight: '500'
       }}>
-        Initializing Compliance Node Session...
+        Loading Account...
       </div>
     );
   }
@@ -100,11 +80,11 @@ function ProtectedLayout({ children }) {
             <Shield size={20} />
           </div>
           <div>
-            <h1 style={{ fontSize: '1.25rem', fontWeight: '800', lineHeight: 1, color: 'var(--text-primary)', fontFamily: "'Space Grotesk', sans-serif" }}>
+            <h1 style={{ fontSize: '1.25rem', fontWeight: '800', lineHeight: 1, color: 'var(--text-primary)' }}>
               PolicyBot
             </h1>
-            <span className="label-eyebrow" style={{ fontSize: '9px', color: 'var(--accent-gold)', fontWeight: '700' }}>
-              GoalFlow Integration
+            <span className="label-eyebrow" style={{ fontSize: '9px', color: 'var(--accent-gold)', fontWeight: '600' }}>
+              AI Assistant
             </span>
           </div>
         </div>
@@ -117,51 +97,17 @@ function ProtectedLayout({ children }) {
           </li>
           <li>
             <NavLink to="/chat" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <MessageSquareCode size={18} /> Q&A Chat Room
+              <MessageSquareCode size={18} /> Chat Assistant
             </NavLink>
           </li>
           <li>
             <NavLink to="/documents" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <Files size={18} /> Policies Sync
+              <Files size={18} /> Documents
             </NavLink>
           </li>
         </nav>
 
-        {/* Node Telemetry Stream Console */}
-        <div 
-          style={{
-            marginTop: 'auto',
-            marginBottom: '20px',
-            padding: '10px 12px',
-            background: '#030303',
-            border: '1px solid var(--border-line)',
-            borderRadius: '6px',
-            fontSize: '9.5px',
-            fontFamily: "'Roboto Mono', monospace",
-            color: 'var(--text-secondary)',
-            boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.85)',
-            overflow: 'hidden'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', borderBottom: '1px solid var(--border-line)', paddingBottom: '4px' }}>
-            <span style={{ color: 'var(--accent-gold)', fontWeight: '700', letterSpacing: '0.05em' }}>SYS TELEMETRY</span>
-            <span className="pulse-dot" style={{ width: '4px', height: '4px' }}></span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-            {telemetryLogs.map((log, lIdx) => {
-              let color = 'var(--text-secondary)';
-              if (log.includes('SYS:')) color = '#81e6a4';
-              if (log.includes('API:')) color = '#62d6e8';
-              if (log.includes('RAG:')) color = '#f55d8f';
-              if (log.includes('DB:')) color = '#f2bb44';
-              return (
-                <div key={lIdx} style={{ color, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                  {log}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+
 
         {/* User Context & Logout Action footer */}
         <div 
@@ -173,18 +119,18 @@ function ProtectedLayout({ children }) {
             gap: '16px'
           }}
         >
-          <div className="flex" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div className="flex" style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: 'auto' }}>
             <div 
               className="flex-center" 
               style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '4px',
-                background: 'rgba(242, 187, 68, 0.1)',
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                background: 'var(--bg-card-secondary)',
                 border: '1px solid var(--border-line)',
-                color: 'var(--accent-gold)',
-                fontWeight: '700',
-                fontSize: '0.8rem',
+                color: 'var(--text-primary)',
+                fontWeight: '600',
+                fontSize: '0.9rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
@@ -193,11 +139,11 @@ function ProtectedLayout({ children }) {
               {user?.username?.substring(0, 2).toUpperCase() || 'AD'}
             </div>
             <div style={{ overflow: 'hidden' }}>
-              <h4 style={{ fontSize: '0.85rem', color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontWeight: '600', fontFamily: "'Space Grotesk', sans-serif" }}>
-                {user?.username || 'cto_admin'}
+              <h4 style={{ fontSize: '0.9rem', color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontWeight: '600' }}>
+                {user?.username || 'User Account'}
               </h4>
-              <span className="label-eyebrow" style={{ fontSize: '8px', color: 'var(--text-secondary)' }}>
-                Compliance Node
+              <span className="label-eyebrow" style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'none', letterSpacing: 'normal' }}>
+                Member
               </span>
             </div>
           </div>
@@ -206,33 +152,28 @@ function ProtectedLayout({ children }) {
             onClick={handleLogout}
             style={{
               width: '100%',
-              background: 'none',
-              border: '1px solid var(--border-line)',
-              color: 'var(--text-secondary)',
+              background: '#fef2f2',
+              border: '1px solid #fee2e2',
+              color: '#ef4444',
               padding: '10px 14px',
               borderRadius: 'var(--radius-sm)',
               cursor: 'pointer',
-              fontSize: '0.8rem',
+              fontSize: '0.9rem',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '10px',
-              fontWeight: '600',
-              transition: 'var(--transition-fast)',
-              fontFamily: "'Space Grotesk', sans-serif"
+              gap: '8px',
+              fontWeight: '500',
+              transition: 'var(--transition-fast)'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.color = 'var(--text-primary)';
-              e.currentTarget.style.borderColor = 'var(--accent-gold)';
-              e.currentTarget.style.background = 'rgba(242, 187, 68, 0.04)';
+              e.currentTarget.style.background = '#fee2e2';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.color = 'var(--text-secondary)';
-              e.currentTarget.style.borderColor = 'var(--border-line)';
-              e.currentTarget.style.background = 'none';
+              e.currentTarget.style.background = '#fef2f2';
             }}
           >
-            <LogOut size={14} /> Disconnect Session
+            <LogOut size={16} /> Log Out
           </button>
         </div>
       </aside>

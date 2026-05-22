@@ -18,8 +18,8 @@ class RAGConfig:
     SUPABASE_URL = os.getenv("SUPABASE_URL", "")
     SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
     DATABASE_URL = os.getenv("DATABASE_URL", "")
-    PGVECTOR_TABLE = os.getenv("PGVECTOR_TABLE", "document_chunks")
-    COLLECTION_NAME = os.getenv("PGVECTOR_TABLE", "document_chunks")  # alias for compatibility
+    PGVECTOR_TABLE = os.getenv("PGVECTOR_TABLE", "document_chunks_ml")
+    COLLECTION_NAME = os.getenv("PGVECTOR_TABLE", "document_chunks_ml")  # alias for compatibility
 
     # BM25 (kept for hybrid retrieval)
     BM25_INDEX_PATH = os.getenv("BM25_INDEX_PATH", "./bm25_index/bm25.pkl")

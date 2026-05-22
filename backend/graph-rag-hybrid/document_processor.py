@@ -41,16 +41,42 @@ class DocumentProcessor:
 
     def _load_pdf(self, file_path: str) -> str:
         try:
-            from pypdf import PdfReader
-            reader = PdfReader(file_path)
-            pages = []
-            for page in reader.pages:
-                text = page.extract_text()
-                if text:
-                    pages.append(text)
-            return "\n\n".join(pages)
+            import pymupdf4llm
+            import re
+            
+            print(f"Loading PDF with pymupdf4llm: {file_path}")
+            md_text = pymupdf4llm.to_markdown(file_path)
+            
+            # Enrich tables by injecting headers into rows
+            lines = md_text.split('\n')
+            enriched_lines = []
+            i = 0
+            while i < len(lines):
+                line = lines[i]
+                # Detect markdown table headers
+                if line.strip().startswith('|') and i + 1 < len(lines) and lines[i+1].strip().startswith('|'):
+                    if re.match(r'^\|[\s\-\|:]+\|$', lines[i+1].strip()):
+                        headers = [h.strip() for h in line.split('|')[1:-1]]
+                        
+                        enriched_lines.append("\n**Table Data:**")
+                        i += 2
+                        while i < len(lines) and lines[i].strip().startswith('|'):
+                            row_cells = [c.strip() for c in lines[i].split('|')[1:-1]]
+                            enriched_row_parts = []
+                            for j, cell in enumerate(row_cells):
+                                if j < len(headers) and cell and cell != '-':
+                                    enriched_row_parts.append(f"{headers[j]}: {cell}")
+                            
+                            if enriched_row_parts:
+                                enriched_lines.append("- " + ", ".join(enriched_row_parts))
+                            i += 1
+                        continue
+                enriched_lines.append(line)
+                i += 1
+                
+            return '\n'.join(enriched_lines)
         except ImportError:
-            raise Exception("PDF support requires 'pypdf'. Install it with: pip install pypdf")
+            raise Exception("PDF support requires 'pymupdf4llm'. Install it with: pip install pymupdf4llm")
         except Exception as e:
             raise Exception(f"Error loading PDF {file_path}: {e}")
 

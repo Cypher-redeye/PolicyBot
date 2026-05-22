@@ -40,33 +40,27 @@ class DocumentRAGSystem:
         print("Initializing RAG System (Supabase + pgvector)...")
         openai_api_key = os.getenv("OPENAI_API_KEY", "")
 
-        # ── Embeddings ──────────────────────────────────────────────────────────
-        if self.config.AZURE_API_KEY:
-            self.embeddings = AzureOpenAIEmbeddings(
-                azure_endpoint=self.config.AZURE_ENDPOINT,
-                api_key=self.config.AZURE_API_KEY,
-                api_version=self.config.AZURE_API_VERSION,
-                azure_deployment=self.config.EMBEDDING_DEPLOYMENT,
+        # ── Embeddings (Multilingual MiniLM — fast + supports 50+ languages) ─────
+        try:
+            from langchain_huggingface import HuggingFaceEmbeddings
+            self.embeddings = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+                model_kwargs={"device": "cpu"},
+                encode_kwargs={"normalize_embeddings": True},
             )
-            print("[OK] Azure OpenAI Embeddings initialized")
-        elif openai_api_key:
-            from langchain_openai import OpenAIEmbeddings
-            self.embeddings = OpenAIEmbeddings(
-                api_key=openai_api_key,
-                model="text-embedding-3-small",
-            )
-            print("[OK] OpenAI Embeddings initialized")
-        else:
+            print("[OK] Multilingual MiniLM embeddings initialized (fast mode)")
+        except Exception as e:
+            print(f"[WARNING] MiniLM failed ({e}), falling back to mock embeddings")
             from langchain_core.embeddings import Embeddings
             class MockEmbeddings(Embeddings):
                 def embed_documents(self, texts: List[str]) -> List[List[float]]:
-                    return [[0.0] * 1536 for _ in texts]
+                    return [[0.0] * 384 for _ in texts]
                 def embed_query(self, text: str) -> List[float]:
-                    return [0.0] * 1536
+                    return [0.0] * 384
             self.embeddings = MockEmbeddings()
-            print("[WARNING] Using Mock Offline Embeddings (no API keys)")
 
         # ── LLM ─────────────────────────────────────────────────────────────────
+        github_token = os.getenv("GITHUB_TOKEN", "")
         if self.config.AZURE_API_KEY:
             self.llm = AzureChatOpenAI(
                 azure_endpoint=self.config.AZURE_ENDPOINT,
@@ -77,6 +71,16 @@ class DocumentRAGSystem:
                 max_tokens=self.config.MAX_TOKENS,
             )
             print("[OK] Azure OpenAI LLM initialized")
+        elif github_token:
+            from langchain_openai import ChatOpenAI
+            self.llm = ChatOpenAI(
+                api_key=github_token,
+                base_url="https://models.inference.ai.azure.com",
+                model="gpt-4o",
+                temperature=self.config.TEMPERATURE,
+                max_tokens=self.config.MAX_TOKENS,
+            )
+            print("[OK] GitHub Models LLM initialized")
         elif openai_api_key:
             from langchain_openai import ChatOpenAI
             self.llm = ChatOpenAI(
@@ -137,6 +141,7 @@ IMPORTANT INSTRUCTIONS:
 4. If the context doesn't contain enough information to fully answer the question, say what information IS available and mention what's missing.
 5. Be conversational, helpful, and provide specific details from the documents when available.
 6. Don't make up information that isn't in the context.
+7. If the user asks in a non-English language, respond in that same language.
 
 Context from documents:
 {context}

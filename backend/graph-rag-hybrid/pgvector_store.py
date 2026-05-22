@@ -61,11 +61,14 @@ class PGVectorStore:
 
         rows = []
         for text, meta, emb in zip(texts, metadatas, embedding_vectors):
-            rows.append({
+            row = {
                 "content": text,
                 "metadata": meta,
                 "embedding": emb,  # PostgREST accepts list → casts to vector
-            })
+            }
+            if meta and "document_id" in meta:
+                row["document_id"] = meta["document_id"]
+            rows.append(row)
 
         # Insert in batches of 50
         batch_size = 50
@@ -82,8 +85,9 @@ class PGVectorStore:
 
     def similarity_search(self, query: str, k: int = 4) -> List[Document]:
         query_embedding = self.embeddings.embed_query(query)
+        rpc_function = f"match_{self.table_name}"
         r = httpx.post(
-            self._rest_url("rpc/match_document_chunks"),
+            self._rest_url(f"rpc/{rpc_function}"),
             json={"query_embedding": query_embedding, "match_count": k},
             headers=self._headers(),
             timeout=30,

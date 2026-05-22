@@ -1,11 +1,11 @@
 import os
-from fastapi import HTTPException, UploadFile, status
+from fastapi import HTTPException, UploadFile, status, BackgroundTasks
 from app.core import supabase_db, supabase_storage
 
 ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md"}
 
 
-def upload_document(file: UploadFile, user_id: str) -> dict:
+def upload_document(file: UploadFile, user_id: str, background_tasks: BackgroundTasks) -> dict:
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File type not supported")
@@ -27,16 +27,18 @@ def upload_document(file: UploadFile, user_id: str) -> dict:
         "status": "uploaded",
     })
 
-    # Ingest into pgvector via RAG pipeline
-    try:
-        from app.rag.pipeline import ingest_document_bytes
-        ingest_document_bytes(file_bytes, file.filename, doc["id"])
-        supabase_db.update("documents", {"id": doc["id"]}, {"status": "indexed"})
-        doc["status"] = "indexed"
-    except Exception as e:
-        print(f"Warning: RAG ingestion failed: {e}")
-        supabase_db.update("documents", {"id": doc["id"]}, {"status": "failed"})
-        doc["status"] = "failed"
+    # Ingest in a background task so upload returns immediately
+    def run_bg_ingestion():
+        try:
+            from app.rag.pipeline import ingest_document_bytes
+            ingest_document_bytes(file_bytes, file.filename, doc["id"])
+            supabase_db.update("documents", {"id": doc["id"]}, {"status": "indexed"})
+            print(f"[OK] Background RAG ingestion successful for document {doc['id']}")
+        except Exception as e:
+            print(f"Warning: Background RAG ingestion failed for document {doc['id']}: {e}")
+            supabase_db.update("documents", {"id": doc["id"]}, {"status": "failed"})
+
+    background_tasks.add_task(run_bg_ingestion)
 
     return doc
 

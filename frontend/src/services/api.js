@@ -153,6 +153,9 @@ export const documentService = {
     const response = await api.get('/v1/documents/');
     return response.data;
   },
+  deleteDocument: async (docId) => {
+    await api.delete(`/v1/documents/${docId}`);
+  },
 };
 
 export const queryService = {

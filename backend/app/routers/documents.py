@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File
+from fastapi import APIRouter, Depends, UploadFile, File, BackgroundTasks
 from app.core.dependencies import get_current_user
 from app.schemas.document import DocumentResponse
 from app.services.document_service import upload_document, list_documents, delete_document
@@ -7,8 +7,12 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 
 
 @router.post("/", response_model=DocumentResponse, status_code=201)
-def upload(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
-    return upload_document(file, current_user["id"])
+def upload(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    return upload_document(file, current_user["id"], background_tasks)
 
 
 @router.get("/", response_model=list[DocumentResponse])

@@ -8,8 +8,7 @@ import {
   Database, 
   RefreshCw,
   Clock,
-  Sparkles,
-  Terminal
+  Trash2
 } from 'lucide-react';
 
 export default function Documents() {
@@ -17,12 +16,8 @@ export default function Documents() {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(null);
   const [message, setMessage] = useState({ text: '', type: '' });
-  const [cliLogs, setCliLogs] = useState([
-    "SYS: Compliance Node Standby. Ingestion engine ready.",
-    "DB: Connected to active SQLite relational fallback storage.",
-    "RAG: ChromaDB Local Vector store collection ready."
-  ]);
 
   const fetchDocuments = async () => {
     setLoading(true);
@@ -31,7 +26,7 @@ export default function Documents() {
       setDocuments(data || []);
     } catch (err) {
       console.error(err);
-      setMessage({ text: 'Failed to retrieve policy documents list.', type: 'error' });
+      setMessage({ text: 'Failed to retrieve documents.', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -46,11 +41,6 @@ export default function Documents() {
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
       setMessage({ text: '', type: '' });
-      setCliLogs(prev => [
-        ...prev,
-        `LATCH: Payload detected [${selectedFile.name}] (${(selectedFile.size / 1024 / 1024).toFixed(2)} MB).`,
-        `SYS: Awaiting index trigger...`
-      ]);
     }
   };
 
@@ -59,29 +49,12 @@ export default function Documents() {
     if (!file) return;
 
     setUploading(true);
-    setMessage({ text: 'Parsing document nodes & computing vector embeddings...', type: 'info' });
-    
-    // Add real pipeline trigger logs
-    setCliLogs([
-      `SYS: Starting ingestion for file payload: [${file.name}]`,
-      `SYS: Computing payload size metrics (${(file.size / 1024 / 1024).toFixed(2)} MB)...`,
-      `API: POST /v1/documents/ - Dispatching payload content...`
-    ]);
+    setMessage({ text: 'Uploading document...', type: 'info' });
 
     try {
-      const response = await documentService.uploadFile(file);
-      
-      // Real API success logs
-      setCliLogs(prev => [
-        ...prev,
-        `API: POST /v1/documents/ - HTTP 201 Created`,
-        `SYS: Ingestion pipeline execution complete.`,
-        `DB: Database record committed (ID: ${response.id}).`,
-        `RAG: Chroma local vector indexing complete. Status: ${response.status || 'indexed'}.`,
-        `SYS: Policy successfully synchronised. Node standby.`
-      ]);
+      await documentService.uploadFile(file);
 
-      setMessage({ text: `Successfully indexed: ${file.name}! Vector DB synchronised.`, type: 'success' });
+      setMessage({ text: `Successfully uploaded: ${file.name}`, type: 'success' });
       setFile(null);
       // Reset input element
       const fileInput = document.getElementById('policy-file-upload');
@@ -92,16 +65,8 @@ export default function Documents() {
     } catch (err) {
       console.error(err);
       
-      const errorMsg = err.response?.data?.detail || 'An error occurred during file ingestion and embedding.';
-      const statusText = err.response ? `HTTP ${err.response.status} ${err.response.statusText || 'Error'}` : 'Network Error';
+      const errorMsg = err.response?.data?.detail || 'An error occurred during file upload.';
       
-      setCliLogs(prev => [
-        ...prev,
-        `API: POST /v1/documents/ - ${statusText}`,
-        `ERROR: Ingestion pipeline execution failed: ${errorMsg}`,
-        `SYS: System halted. Awaiting fresh payload.`
-      ]);
-
       setMessage({ 
         text: errorMsg, 
         type: 'error' 
@@ -111,18 +76,33 @@ export default function Documents() {
     }
   };
 
+  const handleDelete = async (docId, filename) => {
+    if (!window.confirm(`Are you sure you want to delete "${filename}"?`)) return;
+    setDeleting(docId);
+    try {
+      await documentService.deleteDocument(docId);
+      setMessage({ text: `Deleted: ${filename}`, type: 'success' });
+      await fetchDocuments();
+    } catch (err) {
+      console.error(err);
+      setMessage({ text: 'Failed to delete document.', type: 'error' });
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   return (
     <div>
       <div className="flex-between" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <div>
-          <h1 className="title-large" style={{ fontFamily: 'var(--font-display)', fontWeight: '800' }}>Policy <span className="text-gold">Management</span></h1>
-          <p className="subtitle" style={{ marginBottom: 0 }}>Upload, index, and synchronise guideline sources into the Vector-Graph Network</p>
+          <h1 className="title-large" style={{ fontWeight: '700' }}>Documents</h1>
+          <p className="subtitle" style={{ marginBottom: 0 }}>Upload documents for your AI assistant to learn from.</p>
         </div>
         <button 
           onClick={fetchDocuments}
           className="flex-center"
           style={{
-            background: 'var(--bg-bento)',
+            background: 'var(--bg-card-secondary)',
             border: '1px solid var(--border-line)',
             color: 'var(--text-primary)',
             padding: '10px 16px',
@@ -133,8 +113,7 @@ export default function Documents() {
             display: 'flex',
             alignItems: 'center',
             transition: 'var(--transition-fast)',
-            fontFamily: 'var(--font-display)',
-            fontWeight: '600'
+            fontWeight: '500'
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = 'var(--accent-gold)';
@@ -145,41 +124,36 @@ export default function Documents() {
             e.currentTarget.style.color = 'var(--text-primary)';
           }}
         >
-          <RefreshCw size={14} className={loading ? 'spin-anim' : ''} /> Sync Store
+          <RefreshCw size={14} className={loading ? 'spin-anim' : ''} /> Refresh
         </button>
       </div>
 
       {message.text && (
         <div 
           style={{
-            background: message.type === 'success' ? 'rgba(39, 194, 108, 0.1)' : 
-                        message.type === 'error' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(242, 187, 68, 0.1)',
+            background: message.type === 'success' ? '#ecfdf5' : 
+                        message.type === 'error' ? '#fef2f2' : '#f0fdfa',
             border: `1px solid ${
-              message.type === 'success' ? 'rgba(39, 194, 108, 0.2)' : 
-              message.type === 'error' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(242, 187, 68, 0.2)'
-            }`,
-            borderLeft: `4px solid ${
-              message.type === 'success' ? '#27c26c' : 
-              message.type === 'error' ? '#ef4444' : 'var(--accent-gold)'
+              message.type === 'success' ? '#d1fae5' : 
+              message.type === 'error' ? '#fee2e2' : '#ccfbf1'
             }`,
             padding: '16px 20px',
             borderRadius: 'var(--radius-md)',
             marginBottom: '32px',
-            color: message.type === 'error' ? '#f87171' : 
-                   message.type === 'success' ? '#4ade80' : 'var(--accent-gold)',
-            fontSize: '0.875rem',
+            color: message.type === 'error' ? '#dc2626' : 
+                   message.type === 'success' ? '#059669' : '#0f766e',
+            fontSize: '0.9rem',
             alignItems: 'center',
             gap: '12px',
-            display: 'flex',
-            boxShadow: 'var(--shadow-bento)'
+            display: 'flex'
           }}
         >
           {message.type === 'success' ? (
-            <CheckCircle size={18} style={{ color: 'var(--accent-gold)' }} />
+            <CheckCircle size={18} />
           ) : message.type === 'error' ? (
-            <AlertTriangle size={18} style={{ color: '#ef4444' }} />
+            <AlertTriangle size={18} />
           ) : (
-            <RefreshCw size={18} className="spin-anim" style={{ color: 'var(--accent-gold)' }} />
+            <RefreshCw size={18} className="spin-anim" />
           )}
           <span style={{ fontWeight: '500' }}>{message.text}</span>
         </div>
@@ -188,10 +162,12 @@ export default function Documents() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', alignItems: 'start' }}>
         {/* Upload Form Box */}
         <div className="bento" style={{ padding: '32px' }}>
-          <span className="label-eyebrow" style={{ display: 'block', marginBottom: '8px' }}>UPLOADER PORTAL</span>
-          <h3 style={{ fontSize: '1.25rem', marginBottom: '24px', fontWeight: '700', fontFamily: 'var(--font-display)' }}>
-            Ingest Corporate <span className="text-gold">Policy</span>
+          <h3 style={{ fontSize: '1.25rem', marginBottom: '8px', fontWeight: '600' }}>
+            Upload File
           </h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+            Select a PDF document to add to the knowledge base.
+          </p>
 
           <form onSubmit={handleUpload} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div 
@@ -200,17 +176,15 @@ export default function Documents() {
                 borderRadius: 'var(--radius-lg)',
                 padding: '48px 24px',
                 textAlign: 'center',
-                background: 'rgba(15, 23, 42, 0.4)',
+                background: 'var(--bg-card-secondary)',
                 cursor: 'pointer',
-                transition: 'var(--transition-smooth)'
+                transition: 'var(--transition-fast)'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = 'var(--accent-gold)';
-                e.currentTarget.style.background = 'rgba(242, 187, 68, 0.04)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = 'var(--border-line)';
-                e.currentTarget.style.background = 'rgba(15, 23, 42, 0.4)';
               }}
               onClick={() => document.getElementById('policy-file-upload').click()}
             >
@@ -221,12 +195,12 @@ export default function Documents() {
                 onChange={handleFileChange}
                 style={{ display: 'none' }}
               />
-              <UploadCloud size={40} style={{ color: file ? 'var(--accent-gold)' : 'var(--text-secondary)', marginBottom: '16px', transition: 'color 0.2s' }} />
-              <h4 style={{ color: 'var(--text-primary)', fontSize: '0.95rem', marginBottom: '6px', fontWeight: '600', fontFamily: file ? 'var(--font-mono)' : 'inherit' }}>
-                {file ? file.name : 'Select Corporate Policy PDF'}
+              <UploadCloud size={40} style={{ color: file ? 'var(--accent-gold)' : 'var(--text-secondary)', marginBottom: '16px', transition: 'color 0.2s', margin: '0 auto' }} />
+              <h4 style={{ color: 'var(--text-primary)', fontSize: '0.95rem', marginBottom: '6px', fontWeight: '500' }}>
+                {file ? file.name : 'Select Document'}
               </h4>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
-                {file ? `Size: ${(file.size / 1024 / 1024).toFixed(2)} MB` : 'Drag and drop or click to browse'}
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                {file ? `Size: ${(file.size / 1024 / 1024).toFixed(2)} MB` : 'Click to browse for a file'}
               </p>
             </div>
 
@@ -238,86 +212,32 @@ export default function Documents() {
                 width: '100%', 
                 padding: '14px', 
                 borderRadius: 'var(--radius-sm)',
-                fontSize: '0.9rem',
+                fontSize: '0.95rem',
                 gap: '10px'
               }}
             >
-              <UploadCloud size={16} /> 
-              {uploading ? 'Processing Guidelines...' : 'Index Guideline PDF'}
+              <UploadCloud size={18} /> 
+              {uploading ? 'Uploading...' : 'Upload Document'}
             </button>
           </form>
-
-          {/* CLI Parsing Terminal */}
-          <div style={{ marginTop: '24px' }}>
-            <div className="flex" style={{ display: 'flex', gap: '8px', color: 'var(--text-primary)', fontSize: '0.8rem', fontWeight: '700', alignItems: 'center', marginBottom: '10px', fontFamily: 'var(--font-mono)' }}>
-              <Terminal size={14} className="text-gold" />
-              <span>INGESTION CLI CONSOLE</span>
-            </div>
-            <div 
-              style={{
-                background: '#030303',
-                border: '1px solid var(--border-line)',
-                borderRadius: '6px',
-                padding: '16px',
-                height: '180px',
-                overflowY: 'auto',
-                color: '#38bdf8',
-                fontFamily: 'var(--font-mono)',
-                fontSize: '0.75rem',
-                boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.85)',
-                lineHeight: '1.6'
-              }}
-            >
-              {cliLogs.map((log, lIdx) => (
-                <div key={lIdx} style={{ display: 'flex', gap: '8px' }}>
-                  <span style={{ color: '#475569', userSelect: 'none' }}>{(lIdx + 1).toString().padStart(2, '0')}</span>
-                  <span style={{ 
-                    color: log.startsWith('ERROR:') ? '#ef4444' : 
-                           log.startsWith('SYS:') ? '#10b981' : 
-                           log.startsWith('NEON_DB:') ? '#f2bb44' : '#38bdf8' 
-                  }}>
-                    {log}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ marginTop: '28px', paddingTop: '20px', borderTop: '1px solid var(--border-line)' }}>
-            <div className="flex" style={{ display: 'flex', gap: '8px', color: 'var(--accent-gold)', fontSize: '0.8rem', fontWeight: '700', alignItems: 'center' }}>
-              <Sparkles size={14} /> TECHNICAL NODE DETAILS
-            </div>
-            <ul style={{ 
-              paddingLeft: '16px', 
-              color: 'var(--text-secondary)', 
-              fontSize: '0.8rem', 
-              marginTop: '12px', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: '10px',
-              lineHeight: '1.4'
-            }}>
-              <li>Extracts raw markdown segments from your policy guidelines PDF.</li>
-              <li>Performs semantic embedding using standard cosine comparison.</li>
-              <li>Stores vector indices inside localized Neon Postgres databases.</li>
-            </ul>
-          </div>
         </div>
 
         {/* Database Guideline Grid */}
         <div className="bento" style={{ padding: '32px' }}>
-          <span className="label-eyebrow" style={{ display: 'block', marginBottom: '8px' }}>VECTOR NETWORK</span>
-          <h3 style={{ fontSize: '1.25rem', marginBottom: '24px', fontWeight: '700', fontFamily: 'var(--font-display)' }}>
-            Index Synchronized <span className="text-gold">Policies</span>
+          <h3 style={{ fontSize: '1.25rem', marginBottom: '8px', fontWeight: '600' }}>
+            Available Documents
           </h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '24px' }}>
+            These documents are currently available for the AI to read.
+          </p>
 
           {loading ? (
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Synchronising documents database...</p>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Loading documents...</p>
           ) : documents.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
-              <Database size={40} style={{ margin: '0 auto 16px', opacity: 0.3, color: 'var(--accent-gold)' }} />
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>No guidelines index stored in the database.</p>
-              <p style={{ fontSize: '0.75rem', marginTop: '6px', color: 'var(--text-muted)' }}>Use the file uploader to synchronize.</p>
+            <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-secondary)' }}>
+              <Database size={40} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
+              <p style={{ fontSize: '0.95rem' }}>No documents uploaded yet.</p>
+              <p style={{ fontSize: '0.85rem', marginTop: '6px' }}>Use the file uploader to add documents.</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -327,21 +247,18 @@ export default function Documents() {
                   style={{
                     padding: '16px',
                     borderRadius: 'var(--radius-md)',
-                    background: 'var(--bg-card)',
+                    background: 'var(--bg-card-secondary)',
                     border: '1px solid var(--border-line)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '16px',
-                    transition: 'var(--transition-fast)',
-                    boxShadow: 'var(--shadow-bento)'
+                    transition: 'var(--transition-fast)'
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.borderColor = 'var(--accent-gold)';
-                    e.currentTarget.style.boxShadow = '0 6px 20px -8px rgba(242,187,68,0.2)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.borderColor = 'var(--border-line)';
-                    e.currentTarget.style.boxShadow = 'var(--shadow-bento)';
                   }}
                 >
                   <div 
@@ -349,40 +266,118 @@ export default function Documents() {
                       width: '40px',
                       height: '40px',
                       borderRadius: '4px',
-                      background: 'rgba(242, 187, 68, 0.05)',
-                      border: '1px solid rgba(242, 187, 68, 0.15)',
+                      background: 'var(--accent-gold-glow)',
                       color: 'var(--accent-gold)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center'
                     }}
                   >
-                    <FileText size={18} />
+                    <FileText size={20} />
                   </div>
                   <div style={{ flex: 1, overflow: 'hidden' }}>
-                    <h4 style={{ color: 'var(--text-primary)', fontSize: '0.875rem', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontWeight: '600' }}>
+                    <h4 style={{ color: 'var(--text-primary)', fontSize: '0.95rem', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontWeight: '500' }}>
                       {doc.filename || doc.name}
                     </h4>
-                    <div className="flex" style={{ display: 'flex', gap: '12px', marginTop: '6px', fontSize: '0.75rem', color: 'var(--text-secondary)', alignItems: 'center' }}>
+                    <div className="flex" style={{ display: 'flex', gap: '12px', marginTop: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)', alignItems: 'center' }}>
                       <span className="flex" style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                        <Clock size={12} /> {new Date(doc.uploaded_at || doc.created_at).toLocaleDateString()}
+                        <Clock size={14} /> {new Date(doc.uploaded_at || doc.created_at).toLocaleDateString()}
                       </span>
-                      <span 
-                        style={{ 
-                          color: 'var(--accent-gold)', 
-                          background: 'rgba(242, 187, 68, 0.08)', 
-                          padding: '2px 8px',
-                          borderRadius: '2px',
-                          fontWeight: '700',
-                          fontSize: '0.7rem',
-                          textTransform: 'uppercase',
-                          fontFamily: 'monospace'
-                        }}
-                      >
-                        Indexed
-                      </span>
+                      {doc.status === 'indexed' && (
+                        <span 
+                          style={{ 
+                            color: '#059669', 
+                            background: '#ecfdf5', 
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontWeight: '500',
+                            fontSize: '0.75rem'
+                          }}
+                        >
+                          Indexed
+                        </span>
+                      )}
+                      {(doc.status === 'uploaded' || doc.status === 'processing') && (
+                        <span 
+                          className="flex"
+                          style={{ 
+                            color: '#d97706', 
+                            background: '#fffbeb', 
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontWeight: '500',
+                            fontSize: '0.75rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <RefreshCw size={10} className="spin-anim" /> Indexing...
+                        </span>
+                      )}
+                      {doc.status === 'failed' && (
+                        <span 
+                          style={{ 
+                            color: '#dc2626', 
+                            background: '#fef2f2', 
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontWeight: '500',
+                            fontSize: '0.75rem'
+                          }}
+                        >
+                          Failed
+                        </span>
+                      )}
+                      {!['indexed', 'uploaded', 'processing', 'failed'].includes(doc.status) && (
+                        <span 
+                          style={{ 
+                            color: '#059669', 
+                            background: '#ecfdf5', 
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontWeight: '500',
+                            fontSize: '0.75rem'
+                          }}
+                        >
+                          Indexed
+                        </span>
+                      )}
                     </div>
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(doc.id, doc.filename || doc.name);
+                    }}
+                    disabled={deleting === doc.id}
+                    title="Delete document"
+                    style={{
+                      background: 'transparent',
+                      border: '1px solid transparent',
+                      color: 'var(--text-secondary)',
+                      cursor: deleting === doc.id ? 'wait' : 'pointer',
+                      padding: '8px',
+                      borderRadius: 'var(--radius-sm)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'var(--transition-fast)',
+                      opacity: deleting === doc.id ? 0.5 : 1
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = '#dc2626';
+                      e.currentTarget.style.background = '#fef2f2';
+                      e.currentTarget.style.borderColor = '#fee2e2';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = 'var(--text-secondary)';
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.borderColor = 'transparent';
+                    }}
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               ))}
             </div>
