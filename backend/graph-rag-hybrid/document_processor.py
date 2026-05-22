@@ -41,42 +41,64 @@ class DocumentProcessor:
 
     def _load_pdf(self, file_path: str) -> str:
         try:
-            import pymupdf4llm
-            import re
+            # First, check page count using pypdf to handle large files memory-safely
+            from pypdf import PdfReader
+            reader = PdfReader(file_path)
+            num_pages = len(reader.pages)
             
-            print(f"Loading PDF with pymupdf4llm: {file_path}")
-            md_text = pymupdf4llm.to_markdown(file_path)
-            
-            # Enrich tables by injecting headers into rows
-            lines = md_text.split('\n')
-            enriched_lines = []
-            i = 0
-            while i < len(lines):
-                line = lines[i]
-                # Detect markdown table headers
-                if line.strip().startswith('|') and i + 1 < len(lines) and lines[i+1].strip().startswith('|'):
-                    if re.match(r'^\|[\s\-\|:]+\|$', lines[i+1].strip()):
-                        headers = [h.strip() for h in line.split('|')[1:-1]]
-                        
-                        enriched_lines.append("\n**Table Data:**")
-                        i += 2
-                        while i < len(lines) and lines[i].strip().startswith('|'):
-                            row_cells = [c.strip() for c in lines[i].split('|')[1:-1]]
-                            enriched_row_parts = []
-                            for j, cell in enumerate(row_cells):
-                                if j < len(headers) and cell and cell != '-':
-                                    enriched_row_parts.append(f"{headers[j]}: {cell}")
-                            
-                            if enriched_row_parts:
-                                enriched_lines.append("- " + ", ".join(enriched_row_parts))
-                            i += 1
-                        continue
-                enriched_lines.append(line)
-                i += 1
+            # If the PDF is large (> 5 pages), use pypdf for fast, memory-safe page-by-page text extraction
+            if num_pages > 5:
+                print(f"Large PDF detected ({num_pages} pages). Using memory-safe pypdf extractor.")
+                text_parts = []
+                for i, page in enumerate(reader.pages):
+                    page_text = page.extract_text()
+                    if page_text:
+                        text_parts.append(page_text)
+                return "\n\n".join(text_parts)
                 
-            return '\n'.join(enriched_lines)
-        except ImportError:
-            raise Exception("PDF support requires 'pymupdf4llm'. Install it with: pip install pymupdf4llm")
+            # Otherwise, try to use pymupdf4llm for rich markdown on smaller PDFs
+            try:
+                import pymupdf4llm
+                import re
+                print(f"Loading small PDF with pymupdf4llm: {file_path}")
+                md_text = pymupdf4llm.to_markdown(file_path)
+                
+                # Enrich tables by injecting headers into rows
+                lines = md_text.split('\n')
+                enriched_lines = []
+                i = 0
+                while i < len(lines):
+                    line = lines[i]
+                    # Detect markdown table headers
+                    if line.strip().startswith('|') and i + 1 < len(lines) and lines[i+1].strip().startswith('|'):
+                        if re.match(r'^\|[\s\-\|:]+\|$', lines[i+1].strip()):
+                            headers = [h.strip() for h in line.split('|')[1:-1]]
+                            
+                            enriched_lines.append("\n**Table Data:**")
+                            i += 2
+                            while i < len(lines) and lines[i].strip().startswith('|'):
+                                row_cells = [c.strip() for c in lines[i].split('|')[1:-1]]
+                                enriched_row_parts = []
+                                for j, cell in enumerate(row_cells):
+                                    if j < len(headers) and cell and cell != '-':
+                                        enriched_row_parts.append(f"{headers[j]}: {cell}")
+                                
+                                if enriched_row_parts:
+                                    enriched_lines.append("- " + ", ".join(enriched_row_parts))
+                                i += 1
+                            continue
+                    enriched_lines.append(line)
+                    i += 1
+                    
+                return '\n'.join(enriched_lines)
+            except Exception as e_mupdf:
+                print(f"Warning: pymupdf4llm failed or not installed ({e_mupdf}). Falling back to pypdf.")
+                text_parts = []
+                for page in reader.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text_parts.append(page_text)
+                return "\n\n".join(text_parts)
         except Exception as e:
             raise Exception(f"Error loading PDF {file_path}: {e}")
 

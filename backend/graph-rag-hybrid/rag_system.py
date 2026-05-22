@@ -42,7 +42,7 @@ class DocumentRAGSystem:
         github_token = os.getenv("GITHUB_TOKEN", "")
 
         # ── Embeddings (Multilingual MiniLM or OpenAI API fallback for Render) ───
-        use_api_embeddings = os.getenv("USE_API_EMBEDDINGS", "false").lower() == "true"
+        use_api_embeddings = os.getenv("USE_API_EMBEDDINGS", "true").lower() == "true"
         
         if use_api_embeddings and (openai_api_key or self.config.AZURE_API_KEY or github_token):
             try:

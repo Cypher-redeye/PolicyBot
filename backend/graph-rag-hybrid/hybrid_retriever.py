@@ -48,7 +48,13 @@ class HybridRetriever(Runnable):
         self.graph_extractor = graph_extractor
         self.config = config
 
-    def invoke(self, question: str, user_id: str | None = None, *args, **kwargs) -> List[Document]:
+    def invoke(self, question: str, config: Any = None, *, user_id: str | None = None, **kwargs) -> List[Document]:
+        # Guard: If LangChain's config dict got passed as a positional argument
+        if isinstance(user_id, dict) or isinstance(config, dict) and user_id is None:
+            # Check if user_id is accidentally holding a config dict
+            if isinstance(user_id, dict):
+                user_id = None
+        
         rankings: List[List[Document]] = []
 
         if self.vector_retriever is not None:
