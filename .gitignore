@@ -1,3 +1,13 @@
 node_modules
 dist
 .env
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Databases and Vector Stores
+*.db
+backend/chroma_db/
+backend/bm25_index/
+backend/scratch/

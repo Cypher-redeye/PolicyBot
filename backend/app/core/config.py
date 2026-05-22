@@ -7,10 +7,16 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "PolicyBot API"
     API_V1_STR: str = "/api/v1"
 
-    # PostgreSQL
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/policybot"
+    # Supabase
+    SUPABASE_URL: str = ""
+    SUPABASE_ANON_KEY: str = ""
+    SUPABASE_SERVICE_KEY: str = ""
+    SUPABASE_STORAGE_BUCKET: str = "policy-documents"
 
-    # JWT
+    # PostgreSQL (Supabase Postgres with pgvector)
+    DATABASE_URL: str = ""
+
+    # JWT (kept for custom auth)
     SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
@@ -23,20 +29,12 @@ class Settings(BaseSettings):
     DEPLOYMENT_NAME: str = "gpt-4o"
     EMBEDDING_DEPLOYMENT: str = "text-embedding-ada-002"
 
-    # ChromaDB
-    CHROMA_PERSIST_DIR: str = "./chroma_db"
-    COLLECTION_NAME: str = "document_qa"
-
-    # Neo4j
-    NEO4J_URI: str = ""
-    NEO4J_USER: str = "neo4j"
-    NEO4J_PASSWORD: str = ""
-    NEO4J_DATABASE: str = "neo4j"
-    GRAPH_ENABLED: bool = True
-
-    # BM25
+    # BM25 (kept for hybrid retrieval)
     BM25_INDEX_PATH: str = "./bm25_index/bm25.pkl"
     BM25_ENABLED: bool = True
+
+    # Graph (disabled — Neo4j removed)
+    GRAPH_ENABLED: bool = False
 
     # RAG tuning
     CHUNK_SIZE: int = 1000
@@ -44,7 +42,6 @@ class Settings(BaseSettings):
     TOP_K: int = 4
     RETRIEVER_K: int = 10
     RRF_K: int = 60
-    GRAPH_HOPS: int = 1
     TEMPERATURE: float = 0.3
     MAX_TOKENS: int = 1000
 

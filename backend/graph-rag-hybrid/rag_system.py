@@ -1,25 +1,24 @@
 from typing import List, Dict, Any, Optional
 import time
+import os
 from pathlib import Path
-import chromadb
+
 from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
-from langchain_chroma import Chroma
 from langchain_core.prompts import PromptTemplate
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 
 from config import RAGConfig
-from logger import MySQLLogger
+from supabase_logger import SupabaseLogger
+from pgvector_store import PGVectorStore
 from document_processor import DocumentProcessor
 from bm25_retriever import BM25Retriever
-from graph_store import GraphStore
-from graph_extractor import GraphExtractor
 from hybrid_retriever import HybridRetriever
 
 
 class DocumentRAGSystem:
-    
+
     def __init__(self, config: RAGConfig):
         self.config = config
         self.embeddings = None
@@ -27,69 +26,36 @@ class DocumentRAGSystem:
         self.vectorstore = None
         self.qa_chain = None
         self.retriever = None
-        
+
         try:
-            self.logger = MySQLLogger(config)
+            self.logger = SupabaseLogger(config)
         except Exception as e:
-            print(f"Warning: MySQLLogger initialization failed entirely ({e}). Using dummy logger.")
-            class ActiveLogger:
-                def __init__(self):
-                    self.queries = []
-                    self.documents = []
-                def log_query(self, query_text, answer, context_texts, execution_time, num_sources, session_id=None):
-                    self.queries.append({
-                        "query": query_text,
-                        "query_text": query_text,
-                        "answer": answer,
-                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                        "execution_time": execution_time,
-                        "num_sources": num_sources,
-                        "session_id": session_id
-                    })
-                def log_document(self, name, doc_type, chunks_count, file_size, file_path):
-                    self.documents.append({
-                        "document_name": name,
-                        "file_size": file_size,
-                        "document_type": doc_type,
-                        "num_chunks": chunks_count,
-                        "upload_timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-                    })
-                def get_recent_queries(self, limit=10, session_id=None):
-                    filtered = [q for q in self.queries if session_id is None or q.get("session_id") == session_id]
-                    return filtered[-limit:]
-                def get_conversation_history(self, session_id, limit=20):
-                    filtered = [q for q in self.queries if q.get("session_id") == session_id]
-                    return filtered[-limit:]
-                def get_all_documents(self):
-                    return self.documents
-                def close(self): pass
-            self.logger = ActiveLogger()
+            print(f"Warning: SupabaseLogger failed ({e}). Using in-memory logger.")
+            self.logger = _InMemoryLogger()
 
         self.document_processor = DocumentProcessor(config)
-        
         self._initialize_components()
-    
+
     def _initialize_components(self):
-        print("Initializing RAG System...")
-        import os
-        
+        print("Initializing RAG System (Supabase + pgvector)...")
         openai_api_key = os.getenv("OPENAI_API_KEY", "")
-        
+
+        # ── Embeddings ──────────────────────────────────────────────────────────
         if self.config.AZURE_API_KEY:
             self.embeddings = AzureOpenAIEmbeddings(
                 azure_endpoint=self.config.AZURE_ENDPOINT,
                 api_key=self.config.AZURE_API_KEY,
                 api_version=self.config.AZURE_API_VERSION,
-                azure_deployment=self.config.EMBEDDING_DEPLOYMENT
+                azure_deployment=self.config.EMBEDDING_DEPLOYMENT,
             )
             print("[OK] Azure OpenAI Embeddings initialized")
         elif openai_api_key:
             from langchain_openai import OpenAIEmbeddings
             self.embeddings = OpenAIEmbeddings(
                 api_key=openai_api_key,
-                model="text-embedding-3-small"
+                model="text-embedding-3-small",
             )
-            print("[OK] Standard OpenAI Embeddings initialized")
+            print("[OK] OpenAI Embeddings initialized")
         else:
             from langchain_core.embeddings import Embeddings
             class MockEmbeddings(Embeddings):
@@ -98,8 +64,9 @@ class DocumentRAGSystem:
                 def embed_query(self, text: str) -> List[float]:
                     return [0.0] * 1536
             self.embeddings = MockEmbeddings()
-            print("[WARNING] Using Mock Offline Embeddings (missing API keys)")
-        
+            print("[WARNING] Using Mock Offline Embeddings (no API keys)")
+
+        # ── LLM ─────────────────────────────────────────────────────────────────
         if self.config.AZURE_API_KEY:
             self.llm = AzureChatOpenAI(
                 azure_endpoint=self.config.AZURE_ENDPOINT,
@@ -107,7 +74,7 @@ class DocumentRAGSystem:
                 api_version=self.config.AZURE_API_VERSION,
                 azure_deployment=self.config.DEPLOYMENT_NAME,
                 temperature=self.config.TEMPERATURE,
-                max_tokens=self.config.MAX_TOKENS
+                max_tokens=self.config.MAX_TOKENS,
             )
             print("[OK] Azure OpenAI LLM initialized")
         elif openai_api_key:
@@ -116,54 +83,51 @@ class DocumentRAGSystem:
                 api_key=openai_api_key,
                 model="gpt-4o",
                 temperature=self.config.TEMPERATURE,
-                max_tokens=self.config.MAX_TOKENS
+                max_tokens=self.config.MAX_TOKENS,
             )
-            print("[OK] Standard OpenAI LLM initialized")
+            print("[OK] OpenAI LLM initialized")
         else:
-            from langchain_core.language_models.chat_models import BaseChatModel
-            from langchain_core.messages import AIMessage
-            from langchain_core.outputs import ChatResult, ChatGeneration
-            class MockChatModel(BaseChatModel):
-                def _generate(self, messages, stop=None, run_manager=None, **kwargs):
-                    prompt_text = messages[-1].content if messages else ""
-                    context = ""
-                    if "Context from documents:" in prompt_text:
-                        try:
-                            context = prompt_text.split("Context from documents:")[1].split("User Question:")[0].strip()
-                        except Exception:
-                            pass
-                    
-                    if context and "No relevant context found." not in context and context.strip():
-                        cleaned_context = context.replace("\n", " ").strip()
-                        if len(cleaned_context) > 250:
-                            cleaned_context = cleaned_context[:250] + "..."
-                        answer = f"Based on the corporate guidelines: {cleaned_context} All employee actions should conform strictly to these parameters."
-                    else:
-                        answer = (
-                            "Greetings! I am PolicyBot. Under offline developer fallback mode (missing API key configuration), "
-                            "the Vector-Graph RAG database is active but local neural synthesis is substituted. Please set "
-                            "OPENAI_API_KEY or AZURE_API_KEY in the environment for full Azure/OpenAI dynamic generation."
-                        )
-                    message = AIMessage(content=answer)
-                    generation = ChatGeneration(message=message)
-                    return ChatResult(generations=[generation])
-                @property
-                def _llm_type(self) -> str:
-                    return "mock_chat_model"
-            self.llm = MockChatModel()
-            print("[WARNING] Using Mock Offline LLM (missing API keys)")
-        
-        chroma_client = chromadb.PersistentClient(
-            path=self.config.CHROMA_PERSIST_DIR
+            self.llm = _MockChatModel()
+            print("[WARNING] Using Mock Offline LLM (no API keys)")
+
+        # ── Vector Store (pgvector via Supabase REST API) ───────────────────────────
+        try:
+            self.vectorstore = PGVectorStore(
+                supabase_url=self.config.SUPABASE_URL,
+                service_key=self.config.SUPABASE_SERVICE_KEY,
+                embeddings=self.embeddings,
+                table_name=self.config.PGVECTOR_TABLE,
+            )
+            print("[OK] pgvector store initialized (Supabase REST API)")
+        except Exception as e:
+            print(f"[ERROR] pgvector initialization failed: {e}")
+            raise
+
+
+        self.retriever = self.vectorstore.as_retriever(
+            search_kwargs={"k": self.config.RETRIEVER_K}
         )
-        
-        self.vectorstore = Chroma(
-            client=chroma_client,
-            collection_name=self.config.COLLECTION_NAME,
-            embedding_function=self.embeddings
+
+        # ── BM25 (kept for hybrid retrieval) ─────────────────────────────────────
+        self.bm25 = None
+        if self.config.BM25_ENABLED:
+            try:
+                self.bm25 = BM25Retriever(self.config)
+                print("[OK] BM25 retriever initialized")
+            except Exception as e:
+                print(f"Warning: BM25 disabled ({e})")
+
+        # ── Hybrid Retriever (vector + BM25, no graph) ────────────────────────────
+        self.hybrid_retriever = HybridRetriever(
+            vector_retriever=self.retriever,
+            bm25_retriever=self.bm25,
+            graph_retriever=None,
+            graph_extractor=None,
+            config=self.config,
         )
-        print("[OK] Vector store initialized")
-        
+        print("[OK] Hybrid retriever initialized (vector + BM25)")
+
+        # ── QA Chain ─────────────────────────────────────────────────────────────
         prompt_template = """You are a helpful and knowledgeable assistant that answers questions based on the provided documents. Your role is to extract and present information from the context documents accurately and clearly.
 
 IMPORTANT INSTRUCTIONS:
@@ -180,54 +144,14 @@ Context from documents:
 User Question: {question}
 
 Answer (based on the context above):"""
-        
-        PROMPT = PromptTemplate(
-            template=prompt_template,
-            input_variables=["context", "question"]
-        )
-        
-        self.retriever = self.vectorstore.as_retriever(
-            search_kwargs={"k": self.config.RETRIEVER_K}
-        )
 
-        self.bm25 = None
-        self.graph = None
-        self.graph_extractor = None
-
-        if self.config.BM25_ENABLED:
-            try:
-                self.bm25 = BM25Retriever(self.config)
-                print("[OK] BM25 retriever initialized")
-            except Exception as e:
-                print(f"Warning: BM25 disabled ({e})")
-
-        if self.config.GRAPH_ENABLED:
-            try:
-                self.graph = GraphStore(self.config)
-                self.graph_extractor = GraphExtractor(self.llm, self.config)
-                print("[OK] Neo4j graph store initialized")
-            except Exception as e:
-                print(f"Warning: graph disabled ({e})")
-                self.graph = None
-                self.graph_extractor = None
-
-        self.hybrid_retriever = HybridRetriever(
-            vector_retriever=self.retriever,
-            bm25_retriever=self.bm25,
-            graph_retriever=self.graph,
-            graph_extractor=self.graph_extractor,
-            config=self.config,
-        )
-        print("[OK] Hybrid retriever initialized")
+        PROMPT = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
 
         def format_docs(docs):
             return "\n\n".join(doc.page_content for doc in docs)
 
         self.qa_chain = (
-            {
-                "context": self.hybrid_retriever | format_docs,
-                "question": RunnablePassthrough()
-            }
+            {"context": self.hybrid_retriever | format_docs, "question": RunnablePassthrough()}
             | PROMPT
             | self.llm
             | StrOutputParser()
@@ -235,149 +159,142 @@ Answer (based on the context above):"""
 
         print("[OK] QA chain initialized")
         print("=" * 50)
-    
-    def add_documents(self, documents: List[str], metadata: Optional[List[Dict]] = None):
-        print(f"Processing {len(documents)} documents...")
-        
-        all_chunks = self.document_processor.process_documents(documents, metadata)
-        
-        if metadata:
-            for i, doc_metadata in enumerate(metadata):
-                doc_name = doc_metadata.get("name", f"document_{i}")
-                doc_type = doc_metadata.get("type", "text")
-                file_size = doc_metadata.get("file_size", 0)
-                file_path = doc_metadata.get("file_path")
-                
-                doc_chunks = [chunk for chunk in all_chunks 
-                            if chunk.metadata.get("doc_index") == i]
-                
-                self.logger.log_document(doc_name, doc_type, len(doc_chunks), 
-                                       file_size, file_path)
-        
-        self.vectorstore.add_documents(all_chunks)
-        print(f"[OK] Added {len(all_chunks)} chunks to vector store")
 
-        if self.bm25:
-            self.bm25.add_documents(all_chunks)
-            print(f"[OK] Added {len(all_chunks)} chunks to BM25 index")
-
-        if self.graph:
-            self.graph.add_chunks(all_chunks)
-            print(f"[OK] Added {len(all_chunks)} Chunk nodes to Neo4j")
-            if self.graph_extractor:
-                print(f"  Extracting entities for {len(all_chunks)} chunks (this can take a minute)...")
-                self.graph_extractor.extract_and_store(all_chunks, self.graph)
-                print(f"[OK] Entity extraction complete")
+    # ── Public API ───────────────────────────────────────────────────────────────
 
     def add_file(self, file_path: str, metadata: Optional[Dict] = None):
         chunks = self.document_processor.process_file(file_path, metadata)
-        
-        if metadata:
-            doc_name = metadata.get("name", Path(file_path).name)
-            doc_type = metadata.get("type", "text")
-            file_size = metadata.get("file_size", 0)
-        else:
-            file_path_obj = Path(file_path)
-            doc_name = file_path_obj.name
-            doc_type = file_path_obj.suffix[1:] if file_path_obj.suffix else "text"
-            file_size = file_path_obj.stat().st_size if file_path_obj.exists() else 0
-        
+
+        file_path_obj = Path(file_path)
+        doc_name = (metadata or {}).get("name", file_path_obj.name)
+        doc_type = file_path_obj.suffix[1:] if file_path_obj.suffix else "text"
+        file_size = file_path_obj.stat().st_size if file_path_obj.exists() else 0
+
         self.logger.log_document(doc_name, doc_type, len(chunks), file_size, file_path)
         self.vectorstore.add_documents(chunks)
-        print(f"[OK] Added {len(chunks)} chunks from {doc_name} to vector store")
+        print(f"[OK] Added {len(chunks)} chunks from {doc_name} to pgvector")
 
         if self.bm25:
             self.bm25.add_documents(chunks)
-        if self.graph:
-            self.graph.add_chunks(chunks)
-            if self.graph_extractor:
-                print(f"  Extracting entities for {len(chunks)} chunks…")
-                self.graph_extractor.extract_and_store(chunks, self.graph)
 
-    def add_directory(self, directory_path: str, extensions: Optional[List[str]] = None):
-        chunks = self.document_processor.process_directory(directory_path, extensions)
-        
-        doc_indices = set(chunk.metadata.get("doc_index") for chunk in chunks)
-        for doc_idx in doc_indices:
-            doc_chunks = [chunk for chunk in chunks if chunk.metadata.get("doc_index") == doc_idx]
-            if doc_chunks:
-                metadata = doc_chunks[0].metadata
-                self.logger.log_document(
-                    metadata.get("name", f"document_{doc_idx}"),
-                    metadata.get("type", "text"),
-                    len(doc_chunks),
-                    metadata.get("file_size", 0),
-                    metadata.get("file_path")
-                )
-        
-        self.vectorstore.add_documents(chunks)
-        print(f"[OK] Added {len(chunks)} chunks from directory to vector store")
-
+    def add_documents(self, documents: List[str], metadata: Optional[List[Dict]] = None):
+        all_chunks = self.document_processor.process_documents(documents, metadata)
+        self.vectorstore.add_documents(all_chunks)
+        print(f"[OK] Added {len(all_chunks)} chunks to pgvector")
         if self.bm25:
-            self.bm25.add_documents(chunks)
-        if self.graph:
-            self.graph.add_chunks(chunks)
-            if self.graph_extractor:
-                print(f"  Extracting entities for {len(chunks)} chunks…")
-                self.graph_extractor.extract_and_store(chunks, self.graph)
+            self.bm25.add_documents(all_chunks)
 
     def query(self, question: str, session_id: Optional[str] = None) -> Dict[str, Any]:
         start_time = time.time()
 
         source_documents = self.hybrid_retriever.invoke(question)
-        
-        if not source_documents or len(source_documents) == 0:
+
+        if not source_documents:
             execution_time = time.time() - start_time
-            answer = "I couldn't find relevant information in the uploaded documents to answer your question. Please make sure the documents contain the information you're looking for, or try rephrasing your question."
-            
-            response = {
-                "answer": answer,
+            return {
+                "answer": "I couldn't find relevant information in the uploaded documents to answer your question. Please make sure the documents contain the information you're looking for, or try rephrasing your question.",
                 "sources": [],
                 "num_sources": 0,
-                "execution_time": execution_time
+                "execution_time": execution_time,
             }
-            return response
-        
+
         answer = self.qa_chain.invoke(question)
-        
         execution_time = time.time() - start_time
-        
-        sources = []
-        for doc in source_documents:
-            source_info = {
+
+        sources = [
+            {
                 "content": doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content,
-                "metadata": doc.metadata
+                "metadata": doc.metadata,
             }
-            sources.append(source_info)
-        
+            for doc in source_documents
+        ]
+
         context_texts = [doc.page_content for doc in source_documents]
-        self.logger.log_query(
-            question, answer, context_texts, 
-            execution_time, len(source_documents), session_id
-        )
-        
-        response = {
+        self.logger.log_query(question, answer, context_texts, execution_time, len(source_documents), session_id)
+
+        return {
             "answer": answer,
             "sources": sources,
             "num_sources": len(sources),
-            "execution_time": execution_time
+            "execution_time": execution_time,
         }
-        
-        return response
-    
+
     def get_history(self, limit: int = 5, session_id: Optional[str] = None) -> List[Dict]:
         return self.logger.get_recent_queries(limit, session_id)
-    
+
     def get_conversation_history(self, session_id: str, limit: int = 20) -> List[Dict]:
         return self.logger.get_conversation_history(session_id, limit)
-    
+
     def get_documents(self) -> List[Dict]:
         return self.logger.get_all_documents()
-    
+
     def close(self):
         self.logger.close()
-        if self.graph:
+
+
+# ── Fallback in-memory logger ────────────────────────────────────────────────
+
+class _InMemoryLogger:
+    def __init__(self):
+        self.queries = []
+        self.documents = []
+
+    def log_query(self, query_text, answer, context_texts, execution_time, num_sources, session_id=None):
+        self.queries.append({
+            "query_text": query_text,
+            "answer": answer,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "execution_time": execution_time,
+            "num_sources": num_sources,
+            "session_id": session_id,
+        })
+
+    def log_document(self, name, doc_type, chunks_count, file_size, file_path):
+        self.documents.append({"document_name": name, "num_chunks": chunks_count})
+
+    def get_recent_queries(self, limit=10, session_id=None):
+        filtered = [q for q in self.queries if session_id is None or q.get("session_id") == session_id]
+        return filtered[-limit:]
+
+    def get_conversation_history(self, session_id, limit=20):
+        return self.get_recent_queries(limit, session_id)
+
+    def get_all_documents(self):
+        return self.documents
+
+    def close(self):
+        pass
+
+
+# ── Fallback mock LLM ────────────────────────────────────────────────────────
+
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage
+from langchain_core.outputs import ChatResult, ChatGeneration
+
+
+class _MockChatModel(BaseChatModel):
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        prompt_text = messages[-1].content if messages else ""
+        context = ""
+        if "Context from documents:" in prompt_text:
             try:
-                self.graph.close()
-            except Exception as e:
-                print(f"Warning: error closing Neo4j: {e}")
+                context = prompt_text.split("Context from documents:")[1].split("User Question:")[0].strip()
+            except Exception:
+                pass
+
+        if context and "No relevant context found." not in context and context.strip():
+            cleaned = context.replace("\n", " ").strip()
+            if len(cleaned) > 250:
+                cleaned = cleaned[:250] + "..."
+            answer = f"Based on the documents: {cleaned}"
+        else:
+            answer = (
+                "PolicyBot is running in offline mode (no API key configured). "
+                "Please set OPENAI_API_KEY or AZURE_API_KEY in your .env file."
+            )
+        return ChatResult(generations=[ChatGeneration(message=AIMessage(content=answer))])
+
+    @property
+    def _llm_type(self) -> str:
+        return "mock_chat_model"

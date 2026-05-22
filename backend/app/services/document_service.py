@@ -1,49 +1,60 @@
 import os
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy.orm import Session
-from app.models.document import Document
-
-UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+from app.core import supabase_db, supabase_storage
 
 ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md"}
 
 
-def upload_document(db: Session, file: UploadFile, user_id: int) -> Document:
+def upload_document(file: UploadFile, user_id: str) -> dict:
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File type not supported")
 
-    filepath = os.path.join(UPLOAD_DIR, file.filename)
-    with open(filepath, "wb") as f:
-        f.write(file.file.read())
+    file_bytes = file.file.read()
+    storage_path = f"{user_id}/{file.filename}"
 
-    doc = Document(filename=file.filename, filepath=filepath, status="uploaded", user_id=user_id)
-    db.add(doc)
-    db.commit()
-    db.refresh(doc)
-
+    # Upload to Supabase Storage
     try:
-        from app.rag.pipeline import ingest_document
-        ingest_document(filepath)
-        doc.status = "indexed"
-    except Exception:
-        doc.status = "failed"
+        supabase_storage.upload_file(storage_path, file_bytes, file.content_type or "application/octet-stream")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Storage upload failed: {e}")
 
-    db.commit()
-    db.refresh(doc)
+    # Record in DB via REST API
+    doc = supabase_db.insert("documents", {
+        "user_id": user_id,
+        "filename": file.filename,
+        "storage_path": storage_path,
+        "status": "uploaded",
+    })
+
+    # Ingest into pgvector via RAG pipeline
+    try:
+        from app.rag.pipeline import ingest_document_bytes
+        ingest_document_bytes(file_bytes, file.filename, doc["id"])
+        supabase_db.update("documents", {"id": doc["id"]}, {"status": "indexed"})
+        doc["status"] = "indexed"
+    except Exception as e:
+        print(f"Warning: RAG ingestion failed: {e}")
+        supabase_db.update("documents", {"id": doc["id"]}, {"status": "failed"})
+        doc["status"] = "failed"
+
     return doc
 
 
-def list_documents(db: Session, user_id: int) -> list[Document]:
-    return db.query(Document).filter(Document.user_id == user_id).all()
+def list_documents(user_id: str) -> list:
+    return supabase_db.select("documents", filters={"user_id": user_id})
 
 
-def delete_document(db: Session, doc_id: int, user_id: int) -> None:
-    doc = db.query(Document).filter(Document.id == doc_id, Document.user_id == user_id).first()
-    if not doc:
+def delete_document(doc_id: str, user_id: str) -> None:
+    docs = supabase_db.select("documents", filters={"id": doc_id, "user_id": user_id})
+    if not docs:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
-    if os.path.exists(doc.filepath):
-        os.remove(doc.filepath)
-    db.delete(doc)
-    db.commit()
+    doc = docs[0]
+
+    # Remove from Supabase Storage
+    try:
+        supabase_storage.delete_file(doc["storage_path"])
+    except Exception as e:
+        print(f"Warning: Storage delete failed: {e}")
+
+    supabase_db.delete("documents", {"id": doc_id})

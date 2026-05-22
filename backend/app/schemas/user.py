@@ -1,3 +1,4 @@
+from uuid import UUID
 from pydantic import BaseModel, EmailStr
 
 
@@ -7,7 +8,7 @@ class UserCreate(BaseModel):
 
 
 class UserResponse(BaseModel):
-    id: int
+    id: UUID
     email: EmailStr
     is_active: bool
 
