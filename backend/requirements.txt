@@ -20,8 +20,9 @@ langchain>=0.1.0
 langchain-text-splitters>=0.0.1
 langchain-openai>=0.1.0
 langchain-core>=0.1.0
-langchain-huggingface>=0.1.0
-sentence-transformers>=3.0.0
+# Note: sentence-transformers and langchain-huggingface (which pull in torch)
+# are excluded here to save 530MB+ wheel downloads and guarantee 100% stable 60MB RAM on Render.
+# For local offline dev with multilingual MiniLM, run: pip install sentence-transformers langchain-huggingface
 rank-bm25>=0.2.2
 pypdf>=3.0.0
 pymupdf>=1.24.0
