@@ -162,7 +162,7 @@ export default function Dashboard() {
                       Question
                     </span>
                     <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                      {new Date(q.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(q.created_at || q.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                   <p style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>{q.query_text}</p>
