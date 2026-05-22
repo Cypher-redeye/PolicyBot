@@ -39,11 +39,12 @@ class DocumentRAGSystem:
     def _initialize_components(self):
         print("Initializing RAG System (Supabase + pgvector)...")
         openai_api_key = os.getenv("OPENAI_API_KEY", "")
+        github_token = os.getenv("GITHUB_TOKEN", "")
 
         # ── Embeddings (Multilingual MiniLM or OpenAI API fallback for Render) ───
         use_api_embeddings = os.getenv("USE_API_EMBEDDINGS", "false").lower() == "true"
         
-        if use_api_embeddings and (openai_api_key or self.config.AZURE_API_KEY):
+        if use_api_embeddings and (openai_api_key or self.config.AZURE_API_KEY or github_token):
             try:
                 from langchain_openai import OpenAIEmbeddings
                 if self.config.AZURE_API_KEY:
@@ -54,13 +55,22 @@ class DocumentRAGSystem:
                         api_version=self.config.AZURE_API_VERSION,
                         azure_deployment=self.config.EMBEDDING_DEPLOYMENT or "text-embedding-3-small",
                     )
+                    print("[OK] Serverless Azure embeddings initialized (dimensions=384, ZERO-RAM mode)")
+                elif github_token and not openai_api_key:
+                    self.embeddings = OpenAIEmbeddings(
+                        model="text-embedding-3-small",
+                        dimensions=384,
+                        api_key=github_token,
+                        base_url="https://models.inference.ai.azure.com"
+                    )
+                    print("[OK] Serverless GitHub Models embeddings initialized (dimensions=384, ZERO-RAM mode)")
                 else:
                     self.embeddings = OpenAIEmbeddings(
                         model="text-embedding-3-small",
                         dimensions=384,  # Fits vector(384) perfectly!
                         api_key=openai_api_key
                     )
-                print("[OK] Serverless OpenAI/Azure embeddings initialized (dimensions=384, ZERO-RAM mode)")
+                    print("[OK] Serverless OpenAI embeddings initialized (dimensions=384, ZERO-RAM mode)")
             except Exception as e:
                 print(f"[WARNING] Serverless embeddings initialization failed ({e}). Falling back to local MiniLM.")
                 use_api_embeddings = False
