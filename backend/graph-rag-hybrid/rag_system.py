@@ -40,24 +40,49 @@ class DocumentRAGSystem:
         print("Initializing RAG System (Supabase + pgvector)...")
         openai_api_key = os.getenv("OPENAI_API_KEY", "")
 
-        # ── Embeddings (Multilingual MiniLM — fast + supports 50+ languages) ─────
-        try:
-            from langchain_huggingface import HuggingFaceEmbeddings
-            self.embeddings = HuggingFaceEmbeddings(
-                model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-                model_kwargs={"device": "cpu"},
-                encode_kwargs={"normalize_embeddings": True},
-            )
-            print("[OK] Multilingual MiniLM embeddings initialized (fast mode)")
-        except Exception as e:
-            print(f"[WARNING] MiniLM failed ({e}), falling back to mock embeddings")
-            from langchain_core.embeddings import Embeddings
-            class MockEmbeddings(Embeddings):
-                def embed_documents(self, texts: List[str]) -> List[List[float]]:
-                    return [[0.0] * 384 for _ in texts]
-                def embed_query(self, text: str) -> List[float]:
-                    return [0.0] * 384
-            self.embeddings = MockEmbeddings()
+        # ── Embeddings (Multilingual MiniLM or OpenAI API fallback for Render) ───
+        use_api_embeddings = os.getenv("USE_API_EMBEDDINGS", "false").lower() == "true"
+        
+        if use_api_embeddings and (openai_api_key or self.config.AZURE_API_KEY):
+            try:
+                from langchain_openai import OpenAIEmbeddings
+                if self.config.AZURE_API_KEY:
+                    from langchain_openai import AzureOpenAIEmbeddings
+                    self.embeddings = AzureOpenAIEmbeddings(
+                        azure_endpoint=self.config.AZURE_ENDPOINT,
+                        api_key=self.config.AZURE_API_KEY,
+                        api_version=self.config.AZURE_API_VERSION,
+                        azure_deployment=self.config.EMBEDDING_DEPLOYMENT or "text-embedding-3-small",
+                    )
+                else:
+                    self.embeddings = OpenAIEmbeddings(
+                        model="text-embedding-3-small",
+                        dimensions=384,  # Fits vector(384) perfectly!
+                        api_key=openai_api_key
+                    )
+                print("[OK] Serverless OpenAI/Azure embeddings initialized (dimensions=384, ZERO-RAM mode)")
+            except Exception as e:
+                print(f"[WARNING] Serverless embeddings initialization failed ({e}). Falling back to local MiniLM.")
+                use_api_embeddings = False
+                
+        if not use_api_embeddings:
+            try:
+                from langchain_huggingface import HuggingFaceEmbeddings
+                self.embeddings = HuggingFaceEmbeddings(
+                    model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+                    model_kwargs={"device": "cpu"},
+                    encode_kwargs={"normalize_embeddings": True},
+                )
+                print("[OK] Multilingual MiniLM embeddings initialized (fast mode)")
+            except Exception as e:
+                print(f"[WARNING] MiniLM failed ({e}), falling back to mock embeddings")
+                from langchain_core.embeddings import Embeddings
+                class MockEmbeddings(Embeddings):
+                    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+                        return [[0.0] * 384 for _ in texts]
+                    def embed_query(self, text: str) -> List[float]:
+                        return [0.0] * 384
+                self.embeddings = MockEmbeddings()
 
         # ── LLM ─────────────────────────────────────────────────────────────────
         github_token = os.getenv("GITHUB_TOKEN", "")
@@ -189,10 +214,10 @@ Answer (based on the context above):"""
         if self.bm25:
             self.bm25.add_documents(all_chunks)
 
-    def query(self, question: str, session_id: Optional[str] = None) -> Dict[str, Any]:
+    def query(self, question: str, user_id: Optional[str] = None, session_id: Optional[str] = None) -> Dict[str, Any]:
         start_time = time.time()
 
-        source_documents = self.hybrid_retriever.invoke(question)
+        source_documents = self.hybrid_retriever.invoke(question, user_id=user_id)
 
         if not source_documents:
             execution_time = time.time() - start_time
@@ -215,7 +240,7 @@ Answer (based on the context above):"""
         ]
 
         context_texts = [doc.page_content for doc in source_documents]
-        self.logger.log_query(question, answer, context_texts, execution_time, len(source_documents), session_id)
+        self.logger.log_query(question, answer, context_texts, execution_time, len(source_documents), session_id, user_id=user_id)
 
         return {
             "answer": answer,
@@ -224,8 +249,8 @@ Answer (based on the context above):"""
             "execution_time": execution_time,
         }
 
-    def get_history(self, limit: int = 5, session_id: Optional[str] = None) -> List[Dict]:
-        return self.logger.get_recent_queries(limit, session_id)
+    def get_history(self, limit: int = 5, user_id: Optional[str] = None, session_id: Optional[str] = None) -> List[Dict]:
+        return self.logger.get_recent_queries(limit, user_id=user_id, session_id=session_id)
 
     def get_conversation_history(self, session_id: str, limit: int = 20) -> List[Dict]:
         return self.logger.get_conversation_history(session_id, limit)
@@ -244,7 +269,7 @@ class _InMemoryLogger:
         self.queries = []
         self.documents = []
 
-    def log_query(self, query_text, answer, context_texts, execution_time, num_sources, session_id=None):
+    def log_query(self, query_text, answer, context_texts, execution_time, num_sources, session_id=None, user_id=None):
         self.queries.append({
             "query_text": query_text,
             "answer": answer,
@@ -252,17 +277,22 @@ class _InMemoryLogger:
             "execution_time": execution_time,
             "num_sources": num_sources,
             "session_id": session_id,
+            "user_id": user_id,
         })
 
     def log_document(self, name, doc_type, chunks_count, file_size, file_path):
         self.documents.append({"document_name": name, "num_chunks": chunks_count})
 
-    def get_recent_queries(self, limit=10, session_id=None):
-        filtered = [q for q in self.queries if session_id is None or q.get("session_id") == session_id]
+    def get_recent_queries(self, limit=10, user_id=None, session_id=None):
+        filtered = [
+            q for q in self.queries 
+            if (session_id is None or q.get("session_id") == session_id)
+            and (user_id is None or q.get("user_id") == user_id)
+        ]
         return filtered[-limit:]
 
-    def get_conversation_history(self, session_id, limit=20):
-        return self.get_recent_queries(limit, session_id)
+    def get_conversation_history(self, session_id, limit=20, user_id=None):
+        return self.get_recent_queries(limit, user_id=user_id, session_id=session_id)
 
     def get_all_documents(self):
         return self.documents

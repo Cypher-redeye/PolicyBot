@@ -48,19 +48,26 @@ class HybridRetriever(Runnable):
         self.graph_extractor = graph_extractor
         self.config = config
 
-    def invoke(self, question: str, *args, **kwargs) -> List[Document]:
+    def invoke(self, question: str, user_id: str | None = None, *args, **kwargs) -> List[Document]:
         rankings: List[List[Document]] = []
 
         if self.vector_retriever is not None:
             try:
-                rankings.append(self.vector_retriever.invoke(question) or [])
+                # Call similarity_search directly on the store to pass user_id parameter securely
+                rankings.append(
+                    self.vector_retriever.store.similarity_search(
+                        question, k=self.vector_retriever.k, user_id=user_id
+                    ) or []
+                )
             except Exception as e:
                 print(f"Warning: vector retrieval failed: {e}")
 
         if self.bm25_retriever is not None:
             try:
                 rankings.append(
-                    self.bm25_retriever.search(question, k=self.config.RETRIEVER_K) or []
+                    self.bm25_retriever.search(
+                        question, k=self.config.RETRIEVER_K, user_id=user_id
+                    ) or []
                 )
             except Exception as e:
                 print(f"Warning: BM25 retrieval failed: {e}")

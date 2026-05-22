@@ -13,7 +13,7 @@ class QueryRequest(BaseModel):
 
 @router.post("/")
 def query(request: QueryRequest, current_user: dict = Depends(get_current_user)):
-    return query_pipeline(request.question, request.session_id)
+    return query_pipeline(request.question, user_id=current_user["id"], session_id=request.session_id)
 
 
 @router.get("/history")
@@ -22,4 +22,5 @@ def get_history(
     session_id: str | None = None,
     current_user: dict = Depends(get_current_user),
 ):
-    return get_rag().get_history(limit=limit, session_id=session_id)
+    return get_rag().get_history(limit=limit, user_id=current_user["id"], session_id=session_id)
+

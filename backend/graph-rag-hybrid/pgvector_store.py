@@ -83,12 +83,15 @@ class PGVectorStore:
             r.raise_for_status()
         print(f"  Stored {len(documents)} chunks in pgvector (via REST)")
 
-    def similarity_search(self, query: str, k: int = 4) -> List[Document]:
+    def similarity_search(self, query: str, k: int = 4, user_id: Optional[str] = None) -> List[Document]:
         query_embedding = self.embeddings.embed_query(query)
         rpc_function = f"match_{self.table_name}"
+        params = {"query_embedding": query_embedding, "match_count": k}
+        if user_id:
+            params["filter_user_id"] = user_id
         r = httpx.post(
             self._rest_url(f"rpc/{rpc_function}"),
-            json={"query_embedding": query_embedding, "match_count": k},
+            json=params,
             headers=self._headers(),
             timeout=30,
         )

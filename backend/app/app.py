@@ -20,3 +20,8 @@ app.add_middleware(
 app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(documents.router, prefix=settings.API_V1_STR)
 app.include_router(query.router, prefix=settings.API_V1_STR)
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "message": "PolicyBot API is active"}

@@ -27,14 +27,22 @@ class SupabaseLogger:
     def _rest(self, path: str) -> str:
         return f"{self._url}/rest/v1/{path}"
 
-    def log_query(self, query_text, answer, context_texts, execution_time, num_sources, session_id=None):
+    def log_query(self, query_text, answer, context_texts, execution_time, num_sources, session_id=None, user_id=None):
         if not self._available:
             return
         try:
+            payload = {
+                "query_text": query_text, 
+                "answer": answer, 
+                "session_id": session_id,
+                "num_sources": num_sources, 
+                "execution_time": execution_time
+            }
+            if user_id:
+                payload["user_id"] = user_id
             httpx.post(
                 self._rest("query_logs"),
-                json={"query_text": query_text, "answer": answer, "session_id": session_id,
-                      "num_sources": num_sources, "execution_time": execution_time},
+                json=payload,
                 headers=self._headers(), timeout=10,
             )
         except Exception as e:
@@ -43,13 +51,15 @@ class SupabaseLogger:
     def log_document(self, name, doc_type, chunks_count, file_size, file_path):
         pass  # Tracked by the API layer
 
-    def get_recent_queries(self, limit: int = 10, session_id: Optional[str] = None) -> List[Dict]:
+    def get_recent_queries(self, limit: int = 10, user_id: Optional[str] = None, session_id: Optional[str] = None) -> List[Dict]:
         if not self._available:
             return []
         try:
             params = {"select": "*", "order": "created_at.desc", "limit": str(limit)}
             if session_id:
                 params["session_id"] = f"eq.{session_id}"
+            if user_id:
+                params["user_id"] = f"eq.{user_id}"
             r = httpx.get(self._rest("query_logs"), params=params, headers=self._headers(), timeout=10)
             r.raise_for_status()
             return r.json()
@@ -57,8 +67,8 @@ class SupabaseLogger:
             print(f"Warning: Failed to fetch query logs ({e})")
             return []
 
-    def get_conversation_history(self, session_id: str, limit: int = 20) -> List[Dict]:
-        return self.get_recent_queries(limit=limit, session_id=session_id)
+    def get_conversation_history(self, session_id: str, limit: int = 20, user_id: Optional[str] = None) -> List[Dict]:
+        return self.get_recent_queries(limit=limit, user_id=user_id, session_id=session_id)
 
     def get_all_documents(self) -> List[Dict]:
         return []

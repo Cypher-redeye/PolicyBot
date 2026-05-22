@@ -26,7 +26,7 @@ class BM25Retriever:
         self.bm25 = BM25Okapi(tokenized)
         self.save()
 
-    def search(self, query: str, k: int = 10) -> List[Document]:
+    def search(self, query: str, k: int = 10, user_id: Optional[str] = None) -> List[Document]:
         if self.bm25 is None or not self.documents:
             return []
         tokens = _tokenize(query)
@@ -34,7 +34,17 @@ class BM25Retriever:
         ranked = sorted(
             zip(scores, self.documents), key=lambda pair: pair[0], reverse=True
         )
-        return [doc for _, doc in ranked[:k]]
+        
+        filtered = []
+        for _, doc in ranked:
+            if user_id:
+                # Restrict to documents belonging to current user
+                doc_user_id = doc.metadata.get("user_id")
+                if doc_user_id and str(doc_user_id) != str(user_id):
+                    continue
+            filtered.append(doc)
+            
+        return filtered[:k]
 
     def save(self) -> None:
         path = Path(self.config.BM25_INDEX_PATH)

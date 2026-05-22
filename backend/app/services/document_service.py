@@ -31,7 +31,7 @@ def upload_document(file: UploadFile, user_id: str, background_tasks: Background
     def run_bg_ingestion():
         try:
             from app.rag.pipeline import ingest_document_bytes
-            ingest_document_bytes(file_bytes, file.filename, doc["id"])
+            ingest_document_bytes(file_bytes, file.filename, doc["id"], user_id)
             supabase_db.update("documents", {"id": doc["id"]}, {"status": "indexed"})
             print(f"[OK] Background RAG ingestion successful for document {doc['id']}")
         except Exception as e:
