@@ -31,12 +31,22 @@ export default function Login() {
       }
     } catch (err) {
       console.error(err);
-      setError(
-        err.response?.data?.detail || 
-        (isRegister 
+      let errMsg = '';
+      if (err.response?.data?.detail) {
+        const detail = err.response.data.detail;
+        if (typeof detail === 'string') {
+          errMsg = detail;
+        } else if (Array.isArray(detail)) {
+          errMsg = detail.map(d => d.msg || JSON.stringify(d)).join(', ');
+        } else {
+          errMsg = JSON.stringify(detail);
+        }
+      } else {
+        errMsg = isRegister 
           ? 'Registration failed. Please ensure your details are correct.' 
-          : 'Sign in failed. Please check your credentials.')
-      );
+          : 'Sign in failed. Please check your credentials.';
+      }
+      setError(errMsg);
     } finally {
       setLoading(false);
     }
