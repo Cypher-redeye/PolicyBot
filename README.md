@@ -1,69 +1,16 @@
-# PolicyBot
+# React + Vite
 
-A RAG-based policy assistant with a FastAPI backend and React frontend.
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-## Project Structure
+Currently, two official plugins are available:
 
-```
-PolicyBot/
-├── backend/
-│   ├── main.py                  # entry point, starts the FastAPI server
-│   ├── requirements.txt
-│   ├── uploads/                 # uploaded policy documents
-│   ├── app/
-│   │   ├── app.py               # FastAPI app instance, CORS, registers routers
-│   │   ├── database.py          # SQLAlchemy engine + session (PostgreSQL)
-│   │   ├── routers/
-│   │   │   ├── auth.py          # register, login endpoints
-│   │   │   ├── documents.py     # upload, list, delete policy documents
-│   │   │   └── query.py         # RAG query endpoint
-│   │   ├── models/
-│   │   │   ├── user.py          # User table
-│   │   │   └── document.py      # Document table
-│   │   ├── schemas/
-│   │   │   ├── user.py          # Pydantic schemas for auth
-│   │   │   └── document.py      # Pydantic schemas for documents
-│   │   ├── services/
-│   │   │   ├── auth_service.py      # register, login logic
-│   │   │   └── document_service.py  # file storage + RAG ingestion
-│   │   ├── rag/
-│   │   │   └── pipeline.py      # bridge to graph-rag-hybrid system
-│   │   └── core/
-│   │       ├── config.py        # all settings via pydantic-settings
-│   │       ├── security.py      # JWT, password hashing
-│   │       └── dependencies.py  # get_db, get_current_user
-│   └── graph-rag-hybrid/        # RAG engine
-│       ├── rag_system.py        # orchestrator wiring all retrievers
-│       ├── document_processor.py # chunking + chunk_id assignment
-│       ├── hybrid_retriever.py  # parallel fan-out + RRF fusion
-│       ├── bm25_retriever.py    # BM25 sparse retriever
-│       ├── graph_store.py       # Neo4j connection + Cypher queries
-│       ├── graph_extractor.py   # LLM-based entity/relation extraction
-│       ├── logger.py            # MySQL session/query logging
-│       ├── config.py            # RAG-specific settings
-│       └── tests/               # unit + integration tests
-│
-└── frontend/
-    └── src/
-        ├── pages/
-        │   ├── Home.jsx
-        │   ├── Login.jsx
-        │   └── Dashboard.jsx
-        ├── components/
-        │   ├── Chat/
-        │   ├── Documents/
-        │   └── Auth/
-        ├── context/
-        │   └── AuthContext.jsx
-        ├── services/
-        │   └── api.js
-        ├── App.jsx
-        └── main.jsx
-```
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-## Tech Stack
+## React Compiler
 
-- **Backend** — FastAPI, SQLAlchemy, PostgreSQL
-- **RAG** — LangChain, ChromaDB, Neo4j, BM25, Azure OpenAI (gpt-4o)
-- **Frontend** — React (Vite)
-- **Auth** — JWT
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+
+## Expanding the ESLint configuration
+
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
