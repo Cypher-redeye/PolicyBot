@@ -57,12 +57,14 @@ class PGVectorStore:
         metadatas = [doc.metadata for doc in documents]
 
         print(f"  Generating embeddings for {len(texts)} chunks in batches...")
+        import time
         embedding_vectors = []
-        embed_batch_size = 100
+        embed_batch_size = 16
         for i in range(0, len(texts), embed_batch_size):
             batch_texts = texts[i:i + embed_batch_size]
             batch_embs = self.embeddings.embed_documents(batch_texts)
             embedding_vectors.extend(batch_embs)
+            time.sleep(1.0)  # Pacing to avoid API rate limits
 
         rows = []
         for text, meta, emb in zip(texts, metadatas, embedding_vectors):
