@@ -36,6 +36,17 @@ export default function Documents() {
     fetchDocuments();
   }, []);
 
+  // Auto-refresh if any document is still indexing
+  useEffect(() => {
+    const hasProcessingDocs = documents.some(doc => doc.status === 'uploaded' || doc.status === 'processing');
+    if (hasProcessingDocs) {
+      const intervalId = setInterval(() => {
+        fetchDocuments();
+      }, 3000); // Poll every 3 seconds
+      return () => clearInterval(intervalId);
+    }
+  }, [documents]);
+
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
