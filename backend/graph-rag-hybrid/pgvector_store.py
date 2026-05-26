@@ -70,10 +70,13 @@ class PGVectorStore:
                 row["document_id"] = meta["document_id"]
             rows.append(row)
 
-        # Insert in batches of 50
-        batch_size = 50
-        for i in range(0, len(rows), batch_size):
-            batch = rows[i:i + batch_size]
+        # Insert in batches of 500 concurrently
+        batch_size = 500
+        batches = [rows[i:i + batch_size] for i in range(0, len(rows), batch_size)]
+
+        from concurrent.futures import ThreadPoolExecutor
+
+        def _insert_batch(batch):
             r = httpx.post(
                 self._rest_url(self.table_name),
                 json=batch,
@@ -81,6 +84,10 @@ class PGVectorStore:
                 timeout=60,
             )
             r.raise_for_status()
+
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            list(executor.map(_insert_batch, batches))
+
         print(f"  Stored {len(documents)} chunks in pgvector (via REST)")
 
     def similarity_search(self, query: str, k: int = 4, user_id: Optional[str] = None) -> List[Document]:

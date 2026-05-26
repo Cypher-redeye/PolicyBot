@@ -17,13 +17,19 @@ class BM25Retriever:
     def __init__(self, config: RAGConfig):
         self.config = config
         self.documents: List[Document] = []
+        self.tokenized_documents: List[List[str]] = []
         self.bm25: Optional[BM25Okapi] = None
         self._load_if_exists()
 
     def add_documents(self, docs: List[Document]) -> None:
         self.documents.extend(docs)
-        tokenized = [_tokenize(d.page_content) for d in self.documents]
-        self.bm25 = BM25Okapi(tokenized)
+        if not hasattr(self, "tokenized_documents"):
+            self.tokenized_documents = [_tokenize(d.page_content) for d in self.documents[:-len(docs)]]
+        
+        new_tokenized = [_tokenize(d.page_content) for d in docs]
+        self.tokenized_documents.extend(new_tokenized)
+        
+        self.bm25 = BM25Okapi(self.tokenized_documents)
         self.save()
 
     def search(self, query: str, k: int = 10, user_id: Optional[str] = None) -> List[Document]:
@@ -50,7 +56,10 @@ class BM25Retriever:
         path = Path(self.config.BM25_INDEX_PATH)
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "wb") as f:
-            pickle.dump({"documents": self.documents}, f)
+            pickle.dump({
+                "documents": self.documents,
+                "tokenized_documents": getattr(self, "tokenized_documents", [])
+            }, f)
 
     def load(self) -> None:
         path = Path(self.config.BM25_INDEX_PATH)
@@ -58,10 +67,14 @@ class BM25Retriever:
             return
         with open(path, "rb") as f:
             data = pickle.load(f)
-        self.documents = data["documents"]
+        self.documents = data.get("documents", [])
+        self.tokenized_documents = data.get("tokenized_documents")
+        
+        if self.tokenized_documents is None:
+            self.tokenized_documents = [_tokenize(d.page_content) for d in self.documents]
+            
         if self.documents:
-            tokenized = [_tokenize(d.page_content) for d in self.documents]
-            self.bm25 = BM25Okapi(tokenized)
+            self.bm25 = BM25Okapi(self.tokenized_documents)
 
     def _load_if_exists(self) -> None:
         try:
