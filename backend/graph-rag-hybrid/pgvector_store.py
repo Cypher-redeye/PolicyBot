@@ -56,8 +56,13 @@ class PGVectorStore:
         texts = [doc.page_content for doc in documents]
         metadatas = [doc.metadata for doc in documents]
 
-        print(f"  Generating embeddings for {len(texts)} chunks...")
-        embedding_vectors = self.embeddings.embed_documents(texts)
+        print(f"  Generating embeddings for {len(texts)} chunks in batches...")
+        embedding_vectors = []
+        embed_batch_size = 100
+        for i in range(0, len(texts), embed_batch_size):
+            batch_texts = texts[i:i + embed_batch_size]
+            batch_embs = self.embeddings.embed_documents(batch_texts)
+            embedding_vectors.extend(batch_embs)
 
         rows = []
         for text, meta, emb in zip(texts, metadatas, embedding_vectors):
