@@ -177,6 +177,7 @@ IMPORTANT INSTRUCTIONS:
 5. Be conversational, helpful, and provide specific details from the documents when available.
 6. Don't make up information that isn't in the context.
 7. If the user asks in a non-English language, respond in that same language.
+8. DO NOT use any markdown formatting, asterisks (like ** or *), or bold text. Keep all text plain and natural-looking.
 
 Context from documents:
 {context}
@@ -203,19 +204,22 @@ Answer (based on the context above):"""
     # ── Public API ───────────────────────────────────────────────────────────────
 
     def add_file(self, file_path: str, metadata: Optional[Dict] = None):
+        doc_name = os.path.basename(file_path)
+        doc_type = os.path.splitext(file_path)[1][1:].upper()
+        file_size = os.path.getsize(file_path)
+        
         chunks = self.document_processor.process_file(file_path, metadata)
+        if not chunks:
+            print(f"Warning: No text extracted from {doc_name}")
+            return
 
-        file_path_obj = Path(file_path)
-        doc_name = (metadata or {}).get("name", file_path_obj.name)
-        doc_type = file_path_obj.suffix[1:] if file_path_obj.suffix else "text"
-        file_size = file_path_obj.stat().st_size if file_path_obj.exists() else 0
-
-        self.logger.log_document(doc_name, doc_type, len(chunks), file_size, file_path)
         self.vectorstore.add_documents(chunks)
         print(f"[OK] Added {len(chunks)} chunks from {doc_name} to pgvector")
 
         if self.bm25:
             self.bm25.add_documents(chunks)
+
+        self.logger.log_document(doc_name, doc_type, len(chunks), file_size, file_path)
 
     def add_documents(self, documents: List[str], metadata: Optional[List[Dict]] = None):
         all_chunks = self.document_processor.process_documents(documents, metadata)
@@ -239,6 +243,10 @@ Answer (based on the context above):"""
             }
 
         answer = self.qa_chain.invoke(question)
+        # Strip markdown stars (asterisks) to make the text look clean and natural
+        if answer:
+            answer = answer.replace("**", "").replace("*", "")
+            
         execution_time = time.time() - start_time
 
         sources = [
