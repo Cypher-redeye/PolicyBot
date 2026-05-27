@@ -179,14 +179,19 @@ export const queryService = {
     });
     return response.data;
   },
-  getRecentQueries: async (limit = 10) => {
-    const response = await api.get(`/v1/query/history?limit=${limit}`);
+  getRecentQueries: async (limit = 10, session_id = null) => {
+    let url = `/v1/query/history?limit=${limit}`;
+    if (session_id) url += `&session_id=${session_id}`;
+    const response = await api.get(url);
     const data = response.data || [];
     return data.map((item) => ({
       ...item,
-      query_text: item.query, // Support Dashboard.jsx mapping compatibility
+      query_text: item.query_text || item.query || "Empty query",
     }));
   },
+  getSessionHistory: async (session_id) => {
+    return queryService.getRecentQueries(100, session_id);
+  }
 };
 
 export default api;

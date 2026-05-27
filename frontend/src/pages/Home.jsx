@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { queryService } from '../services/api';
 import { 
   Send, 
@@ -15,14 +16,11 @@ import { t } from '../utils/i18n';
 export default function Home() {
   const { user } = useAuth();
   const currentLang = user?.preferredLanguage || 'English';
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [sessionId, setSessionId] = useState(searchParams.get('session_id') || null);
 
-  const [messages, setMessages] = useState([
-    {
-      sender: 'bot',
-      text: t(currentLang, 'greeting'),
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [expandedCitationIdx, setExpandedCitationIdx] = useState(null);
@@ -38,14 +36,60 @@ export default function Home() {
   }, [messages, loading]);
 
   useEffect(() => {
-    if (messages.length === 1 && messages[0].sender === 'bot') {
+    async function loadHistory() {
+      if (sessionId) {
+        setLoading(true);
+        try {
+          const history = await queryService.getSessionHistory(sessionId);
+          if (history && history.length > 0) {
+            // History comes ordered by created_at desc, so we reverse it
+            const reversed = [...history].reverse();
+            const formattedMessages = [];
+            reversed.forEach(item => {
+              formattedMessages.push({
+                sender: 'user',
+                text: item.query_text,
+                timestamp: new Date(item.created_at)
+              });
+              formattedMessages.push({
+                sender: 'bot',
+                text: item.answer || "No answer recorded.",
+                timestamp: new Date(item.created_at)
+              });
+            });
+            setMessages(formattedMessages);
+          } else {
+             setMessages([{ sender: 'bot', text: t(currentLang, 'greeting'), timestamp: new Date() }]);
+          }
+        } catch (err) {
+          console.error("Failed to load history", err);
+          setMessages([{ sender: 'bot', text: t(currentLang, 'greeting'), timestamp: new Date() }]);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setMessages([{ sender: 'bot', text: t(currentLang, 'greeting'), timestamp: new Date() }]);
+      }
+    }
+    loadHistory();
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId && messages.length === 1 && messages[0].sender === 'bot') {
       setMessages([{ sender: 'bot', text: t(currentLang, 'greeting'), timestamp: new Date() }]);
     }
-  }, [currentLang]);
+  }, [currentLang, sessionId]);
 
   const handleSend = async (e) => {
     e.preventDefault();
     if (!inputText.trim() || loading) return;
+
+    let activeSession = sessionId;
+    if (!activeSession) {
+      activeSession = crypto.randomUUID();
+      setSessionId(activeSession);
+      navigate(`/chat?session_id=${activeSession}`, { replace: true });
+    }
 
     const userQuery = inputText;
     setInputText('');
@@ -58,7 +102,7 @@ export default function Home() {
     
     setLoading(true);
     try {
-      const response = await queryService.ask(userQuery);
+      const response = await queryService.ask(userQuery, activeSession);
       
       const botReply = response.answer || "I could not find an answer in the uploaded documents. Please try rephrasing your question.";
       const citations = response.sources || [];
@@ -89,6 +133,8 @@ export default function Home() {
   };
 
   const clearChat = () => {
+    setSessionId(null);
+    navigate('/chat', { replace: true });
     setMessages([
       {
         sender: 'bot',

@@ -136,7 +136,8 @@ export default function Dashboard() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {recentQueries.map((q, idx) => (
-                <div 
+                <Link 
+                  to={`/chat?session_id=${q.session_id || q.id}`}
                   key={idx} 
                   style={{
                     padding: '16px',
@@ -145,8 +146,12 @@ export default function Dashboard() {
                     border: '1px solid var(--border-line)',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '8px'
+                    gap: '8px',
+                    textDecoration: 'none',
+                    transition: 'border-color 0.2s',
                   }}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--accent-gold)'}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-line)'}
                 >
                   <div className="flex-between" style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span 
@@ -166,7 +171,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                   <p style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>{q.query_text}</p>
-                </div>
+                </Link>
               ))}
             </div>
           )}
