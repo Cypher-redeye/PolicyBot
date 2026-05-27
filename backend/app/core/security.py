@@ -8,7 +8,7 @@ from app.core.config import settings
 
 
 def hash_password(password: str) -> str:
-    iterations = 100000
+    iterations = 600000
     salt = os.urandom(16)
     pwd_bytes = password.encode('utf-8')
     hashed = hashlib.pbkdf2_hmac('sha256', pwd_bytes, salt, iterations)

@@ -6,12 +6,13 @@ ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md"}
 
 
 def upload_document(file: UploadFile, user_id: str, background_tasks: BackgroundTasks) -> dict:
-    ext = os.path.splitext(file.filename)[1].lower()
+    safe_filename = os.path.basename(file.filename)
+    ext = os.path.splitext(safe_filename)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File type not supported")
 
     file_bytes = file.file.read()
-    storage_path = f"{user_id}/{file.filename}"
+    storage_path = f"{user_id}/{safe_filename}"
 
     # Upload to Supabase Storage
     try:
@@ -22,7 +23,7 @@ def upload_document(file: UploadFile, user_id: str, background_tasks: Background
     # Record in DB via REST API
     doc = supabase_db.insert("documents", {
         "user_id": user_id,
-        "filename": file.filename,
+        "filename": safe_filename,
         "storage_path": storage_path,
         "status": "uploaded",
     })
@@ -31,7 +32,7 @@ def upload_document(file: UploadFile, user_id: str, background_tasks: Background
     def run_bg_ingestion():
         try:
             from app.rag.pipeline import ingest_document_bytes
-            ingest_document_bytes(file_bytes, file.filename, doc["id"], user_id)
+            ingest_document_bytes(file_bytes, safe_filename, doc["id"], user_id)
             supabase_db.update("documents", {"id": doc["id"]}, {"status": "indexed"})
             print(f"[OK] Background RAG ingestion successful for document {doc['id']}")
         except Exception as e:
@@ -59,4 +60,4 @@ def delete_document(doc_id: str, user_id: str) -> None:
     except Exception as e:
         print(f"Warning: Storage delete failed: {e}")
 
-    supabase_db.delete("documents", {"id": doc_id})
+    supabase_db.delete("documents", {"id": doc_id, "user_id": user_id})
