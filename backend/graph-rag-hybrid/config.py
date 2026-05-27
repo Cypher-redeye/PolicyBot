@@ -25,9 +25,12 @@ class RAGConfig:
     BM25_INDEX_PATH = os.getenv("BM25_INDEX_PATH", "./bm25_index/bm25.pkl")
     BM25_ENABLED = os.getenv("BM25_ENABLED", "true").lower() == "true"
 
-    # Graph (disabled — Neo4j removed)
-    GRAPH_ENABLED = False
-    ENTITY_TYPES = ["Person", "Organization", "Location", "Concept", "Event", "Document", "Policy"]
+    # Graph (Supabase PostgreSQL — enabled)
+    GRAPH_ENABLED = os.getenv("GRAPH_ENABLED", "true").lower() == "true"
+    GRAPH_HOPS = int(os.getenv("GRAPH_HOPS", "2"))
+    ENTITY_TYPES = ["Person", "Organization", "Location", "Concept", "Event", "Document", "Policy", "Department", "Role", "Process"]
+    EXTRACTION_MAX_CHARS = int(os.getenv("EXTRACTION_MAX_CHARS", "4000"))
+    EXTRACTION_CONCURRENCY = int(os.getenv("EXTRACTION_CONCURRENCY", "3"))
 
     # Chunking
     CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1000"))

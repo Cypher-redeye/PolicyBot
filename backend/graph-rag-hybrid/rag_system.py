@@ -15,6 +15,8 @@ from pgvector_store import PGVectorStore
 from document_processor import DocumentProcessor
 from bm25_retriever import BM25Retriever
 from hybrid_retriever import HybridRetriever
+from graph_store import GraphStore
+from graph_extractor import GraphExtractor
 
 
 class DocumentRAGSystem:
@@ -26,6 +28,8 @@ class DocumentRAGSystem:
         self.vectorstore = None
         self.qa_chain = None
         self.retriever = None
+        self.graph_store = None
+        self.graph_extractor = None
 
         try:
             self.logger = SupabaseLogger(config)
@@ -156,15 +160,29 @@ class DocumentRAGSystem:
             except Exception as e:
                 print(f"Warning: BM25 disabled ({e})")
 
-        # ── Hybrid Retriever (vector + BM25, no graph) ────────────────────────────
+        # ── Knowledge Graph (Supabase PostgreSQL) ─────────────────────────────────
+        if self.config.GRAPH_ENABLED:
+            try:
+                self.graph_store = GraphStore(self.config)
+                self.graph_extractor = GraphExtractor(self.llm, self.config)
+                print("[OK] Knowledge Graph initialized (Supabase PostgreSQL)")
+            except Exception as e:
+                print(f"Warning: Knowledge Graph disabled ({e})")
+                self.graph_store = None
+                self.graph_extractor = None
+
+        # ── Hybrid Retriever (vector + BM25 + graph) ──────────────────────────────
         self.hybrid_retriever = HybridRetriever(
             vector_retriever=self.retriever,
             bm25_retriever=self.bm25,
-            graph_retriever=None,
-            graph_extractor=None,
+            graph_retriever=self.graph_store,
+            graph_extractor=self.graph_extractor,
             config=self.config,
         )
-        print("[OK] Hybrid retriever initialized (vector + BM25)")
+        retriever_parts = ["vector"]
+        if self.bm25: retriever_parts.append("BM25")
+        if self.graph_store: retriever_parts.append("graph")
+        print(f"[OK] Hybrid retriever initialized ({' + '.join(retriever_parts)})")
 
         # ── QA Chain ─────────────────────────────────────────────────────────────
         prompt_template = """You are a helpful and knowledgeable assistant that answers questions based on the provided documents. Your role is to extract and present information from the context documents accurately and clearly.
@@ -220,6 +238,14 @@ Answer (in {language}, based on the context above):"""
         if self.bm25:
             self.bm25.add_documents(chunks)
 
+        # Extract entities and relations into the Knowledge Graph
+        if self.graph_store and self.graph_extractor:
+            try:
+                self.graph_extractor.extract_and_store(chunks, self.graph_store)
+                print(f"[OK] Extracted entities from {doc_name} into Knowledge Graph")
+            except Exception as e:
+                print(f"Warning: Graph extraction failed for {doc_name}: {e}")
+
         self.logger.log_document(doc_name, doc_type, len(chunks), file_size, file_path)
 
     def add_documents(self, documents: List[str], metadata: Optional[List[Dict]] = None):
@@ -228,6 +254,14 @@ Answer (in {language}, based on the context above):"""
         print(f"[OK] Added {len(all_chunks)} chunks to pgvector")
         if self.bm25:
             self.bm25.add_documents(all_chunks)
+
+        # Extract entities and relations into the Knowledge Graph
+        if self.graph_store and self.graph_extractor:
+            try:
+                self.graph_extractor.extract_and_store(all_chunks, self.graph_store)
+                print(f"[OK] Extracted entities from documents into Knowledge Graph")
+            except Exception as e:
+                print(f"Warning: Graph extraction failed: {e}")
 
     def query(self, question: str, user_id: Optional[str] = None, session_id: Optional[str] = None, language: str = "English") -> Dict[str, Any]:
         start_time = time.time()
