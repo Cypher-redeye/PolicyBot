@@ -14,7 +14,7 @@ export default function Home() {
   const [messages, setMessages] = useState([
     {
       sender: 'bot',
-      text: "Hello! I am your AI policy assistant. Ask me any question regarding your corporate policies, security guidelines, or operational manuals.",
+      text: "Hello! I am PolicyBot. Ask me any question regarding your corporate policies, security guidelines, or operational manuals.",
       timestamp: new Date()
     }
   ]);
@@ -157,7 +157,7 @@ export default function Home() {
             >
               {msg.sender === 'user' ? <User size={14} /> : <Bot size={14} />}
               <span className="label-eyebrow" style={{ fontSize: '10px', color: 'inherit' }}>
-                {msg.sender === 'user' ? 'YOU' : 'AI ASSISTANT'}
+                {msg.sender === 'user' ? 'YOU' : 'PolicyBot'}
               </span>
             </div>
 
