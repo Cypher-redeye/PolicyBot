@@ -59,16 +59,25 @@ export default function Home() {
             });
             setMessages(formattedMessages);
           } else {
-             setMessages([{ sender: 'bot', text: t(currentLang, 'greeting'), timestamp: new Date() }]);
+            setMessages(prev => {
+              if (prev.some(m => m.sender === 'user')) return prev;
+              return [{ sender: 'bot', text: t(currentLang, 'greeting'), timestamp: new Date() }];
+            });
           }
         } catch (err) {
           console.error("Failed to load history", err);
-          setMessages([{ sender: 'bot', text: t(currentLang, 'greeting'), timestamp: new Date() }]);
+          setMessages(prev => {
+            if (prev.some(m => m.sender === 'user')) return prev;
+            return [{ sender: 'bot', text: t(currentLang, 'greeting'), timestamp: new Date() }];
+          });
         } finally {
           setLoading(false);
         }
       } else {
-        setMessages([{ sender: 'bot', text: t(currentLang, 'greeting'), timestamp: new Date() }]);
+        setMessages(prev => {
+          if (prev.some(m => m.sender === 'user')) return prev;
+          return [{ sender: 'bot', text: t(currentLang, 'greeting'), timestamp: new Date() }];
+        });
       }
     }
     loadHistory();
