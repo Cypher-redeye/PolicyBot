@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { t } from '../utils/i18n';
+import { jsPDF } from "jspdf";
 
 export default function Home() {
   const { user } = useAuth();
@@ -276,14 +277,52 @@ export default function Home() {
   }, []);
 
   const exportChat = () => {
-    const textContent = messages.map(m => `[${m.timestamp.toLocaleTimeString()}] ${m.sender.toUpperCase()}: ${m.text}`).join('\n\n');
-    const blob = new Blob([textContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `PolicyBot_Chat_${new Date().toISOString().split('T')[0]}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const doc = new jsPDF();
+    let y = 15;
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("PolicyBot Chat Transcript", 15, y);
+    y += 15;
+    
+    doc.setFontSize(11);
+    
+    messages.forEach((m) => {
+      // Check if we need a new page before writing
+      if (y > 275) {
+        doc.addPage();
+        y = 15;
+      }
+      
+      const time = m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const sender = m.sender === 'user' ? 'YOU' : 'POLICYBOT';
+      
+      // Draw header (Time & Sender)
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(m.sender === 'user' ? 40 : 184, 134, 11); // Dark grey vs Gold/Brownish
+      doc.text(`[${time}] ${sender}:`, 15, y);
+      y += 6;
+      
+      // Draw message text
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(60, 60, 60);
+      
+      // Split text to fit within page width (180mm out of 210mm)
+      const splitText = doc.splitTextToSize(m.text, 180);
+      
+      splitText.forEach(line => {
+        if (y > 280) {
+          doc.addPage();
+          y = 15;
+        }
+        doc.text(line, 15, y);
+        y += 6;
+      });
+      
+      y += 8; // Extra padding between messages
+    });
+    
+    doc.save(`PolicyBot_Chat_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   const clearChat = async () => {
