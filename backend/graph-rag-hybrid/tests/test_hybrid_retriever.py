@@ -21,7 +21,9 @@ def test_invoke_runs_all_three_and_fuses():
     config = make_config()
 
     vec = MagicMock()
-    vec.invoke = MagicMock(return_value=[doc("a"), doc("b"), doc("c")])
+    vec.k = 3
+    vec.store = MagicMock()
+    vec.store.similarity_search = MagicMock(return_value=[doc("a"), doc("b"), doc("c")])
 
     bm25 = MagicMock()
     bm25.search = MagicMock(return_value=[doc("a"), doc("d"), doc("e")])
@@ -41,7 +43,7 @@ def test_invoke_runs_all_three_and_fuses():
     )
     result = retriever.invoke("question")
 
-    vec.invoke.assert_called_once()
+    vec.store.similarity_search.assert_called_once()
     bm25.search.assert_called_once()
     graph.search.assert_called_once()
 
@@ -52,7 +54,9 @@ def test_invoke_runs_all_three_and_fuses():
 def test_invoke_skips_disabled_retrievers():
     config = make_config()
     vec = MagicMock()
-    vec.invoke = MagicMock(return_value=[doc("a"), doc("b")])
+    vec.k = 3
+    vec.store = MagicMock()
+    vec.store.similarity_search = MagicMock(return_value=[doc("a"), doc("b")])
 
     retriever = HybridRetriever(
         vector_retriever=vec,
@@ -69,7 +73,9 @@ def test_invoke_skips_disabled_retrievers():
 def test_invoke_handles_graph_failure_gracefully():
     config = make_config()
     vec = MagicMock()
-    vec.invoke = MagicMock(return_value=[doc("a")])
+    vec.k = 3
+    vec.store = MagicMock()
+    vec.store.similarity_search = MagicMock(return_value=[doc("a")])
     bm25 = MagicMock()
     bm25.search = MagicMock(return_value=[doc("b")])
 

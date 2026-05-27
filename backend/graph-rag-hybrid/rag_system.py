@@ -187,6 +187,7 @@ User Question: {question}
 Answer (based on the context above):"""
 
         PROMPT = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
+        self.qa_prompt = PROMPT
 
         def format_docs(docs):
             return "\n\n".join(doc.page_content for doc in docs)
@@ -242,7 +243,16 @@ Answer (based on the context above):"""
                 "execution_time": execution_time,
             }
 
-        answer = self.qa_chain.invoke(question)
+        # Format context from the source_documents we already retrieved using the correct user_id
+        def format_docs(docs):
+            return "\n\n".join(doc.page_content for doc in docs)
+            
+        context = format_docs(source_documents)
+
+        # Generate answer using the correctly filtered context
+        llm_chain = self.qa_prompt | self.llm | StrOutputParser()
+        answer = llm_chain.invoke({"context": context, "question": question})
+
         # Strip markdown stars (asterisks) to make the text look clean and natural
         if answer:
             answer = answer.replace("**", "").replace("*", "")

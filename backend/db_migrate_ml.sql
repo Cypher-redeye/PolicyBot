@@ -20,7 +20,8 @@ create index if not exists document_chunks_ml_embedding_idx
 -- 3. Match chunks function for MiniLM vector similarity search
 create or replace function match_document_chunks_ml(
     query_embedding vector(384),
-    match_count     int default 10
+    match_count     int default 10,
+    filter_user_id  text default null
 )
 returns table (
     id          uuid,
@@ -38,6 +39,7 @@ as $$
         metadata,
         1 - (embedding <=> query_embedding) as similarity
     from document_chunks_ml
+    where (filter_user_id is null or (metadata->>'user_id') = filter_user_id)
     order by embedding <=> query_embedding
     limit match_count;
 $$;

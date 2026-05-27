@@ -27,6 +27,7 @@ class RAGConfig:
 
     # Graph (disabled — Neo4j removed)
     GRAPH_ENABLED = False
+    ENTITY_TYPES = ["Person", "Organization", "Location", "Concept", "Event", "Document", "Policy"]
 
     # Chunking
     CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1000"))

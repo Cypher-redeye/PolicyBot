@@ -57,7 +57,8 @@ create index if not exists query_logs_created_at_idx on query_logs(created_at de
 -- 6. Match chunks function for vector similarity search
 create or replace function match_document_chunks(
     query_embedding vector(1536),
-    match_count     int default 10
+    match_count     int default 10,
+    filter_user_id  text default null
 )
 returns table (
     id          uuid,
@@ -75,6 +76,7 @@ as $$
         metadata,
         1 - (embedding <=> query_embedding) as similarity
     from document_chunks
+    where (filter_user_id is null or (metadata->>'user_id') = filter_user_id)
     order by embedding <=> query_embedding
     limit match_count;
 $$;
