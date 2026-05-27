@@ -57,7 +57,7 @@ class SupabaseLogger:
         try:
             params = {"select": "*", "order": "created_at.desc", "limit": str(limit)}
             if session_id:
-                params["session_id"] = f"eq.{session_id}"
+                params["or"] = f"(session_id.eq.{session_id},id.eq.{session_id})"
             if user_id:
                 params["user_id"] = f"eq.{user_id}"
             r = httpx.get(self._rest("query_logs"), params=params, headers=self._headers(), timeout=10)
