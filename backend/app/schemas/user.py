@@ -11,8 +11,13 @@ class UserResponse(BaseModel):
     id: UUID
     email: EmailStr
     is_active: bool
+    preferred_language: str = "English"
 
     model_config = {"from_attributes": True}
+
+
+class UserUpdate(BaseModel):
+    preferred_language: str
 
 
 class Token(BaseModel):

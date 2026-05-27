@@ -33,7 +33,11 @@ export function AuthProvider({ children }) {
       const data = await authService.login(username, password);
       if (data.access_token) {
         setToken(data.access_token);
-        setUser({ username });
+        const me = await authService.getMe();
+        const preferredLanguage = me.preferred_language || 'English';
+        const userData = { username, preferredLanguage };
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
       }
       return data;
     } catch (err) {
@@ -41,6 +45,17 @@ export function AuthProvider({ children }) {
       throw err;
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateUserLanguage = async (language) => {
+    try {
+      await authService.updateLanguage(language);
+      const newUserData = { ...user, preferredLanguage: language };
+      setUser(newUserData);
+      localStorage.setItem('user', JSON.stringify(newUserData));
+    } catch (err) {
+      console.error('Failed to update language', err);
     }
   };
 
@@ -70,6 +85,7 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    updateUserLanguage,
     isAuthenticated: !!token,
   };
 

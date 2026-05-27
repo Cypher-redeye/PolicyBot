@@ -143,6 +143,14 @@ export const authService = {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
   },
+  getMe: async () => {
+    const response = await api.get('/v1/auth/me');
+    return response.data;
+  },
+  updateLanguage: async (language) => {
+    const response = await api.patch('/v1/auth/me/language', { preferred_language: language });
+    return response.data;
+  },
 };
 
 export const documentService = {

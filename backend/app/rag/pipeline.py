@@ -34,6 +34,6 @@ def ingest_document(filepath: str) -> None:
     get_rag().add_file(filepath)
 
 
-def query_pipeline(question: str, user_id: str, session_id: str | None = None) -> dict:
-    return get_rag().query(question, user_id=user_id, session_id=session_id)
+def query_pipeline(question: str, user_id: str, session_id: str | None = None, language: str = "English") -> dict:
+    return get_rag().query(question, user_id=user_id, session_id=session_id, language=language)
 

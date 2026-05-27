@@ -9,12 +9,17 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { t } from '../utils/i18n';
 
 export default function Home() {
+  const { user } = useAuth();
+  const currentLang = user?.preferredLanguage || 'English';
+
   const [messages, setMessages] = useState([
     {
       sender: 'bot',
-      text: "Hello! I am PolicyBot. Ask me any question regarding your corporate policies, security guidelines, or operational manuals.",
+      text: t(currentLang, 'greeting'),
       timestamp: new Date()
     }
   ]);
@@ -31,6 +36,12 @@ export default function Home() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, loading]);
+
+  useEffect(() => {
+    if (messages.length === 1 && messages[0].sender === 'bot') {
+      setMessages([{ sender: 'bot', text: t(currentLang, 'greeting'), timestamp: new Date() }]);
+    }
+  }, [currentLang]);
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -103,10 +114,10 @@ export default function Home() {
       >
         <div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: '700' }}>
-            Chat Assistant
+            {t(currentLang, 'chatAssistant')}
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            Ask questions about your company policies and get instant answers.
+            {t(currentLang, 'chatSubtitle')}
           </p>
         </div>
 
@@ -129,7 +140,7 @@ export default function Home() {
           onMouseEnter={(e) => e.currentTarget.style.background = '#fee2e2'}
           onMouseLeave={(e) => e.currentTarget.style.background = '#fef2f2'}
         >
-          <Trash2 size={16} /> Clear Chat
+          <Trash2 size={16} /> {t(currentLang, 'clearChat')}
         </button>
       </div>
 
@@ -261,7 +272,7 @@ export default function Home() {
         <input
           type="text"
           className="form-input"
-          placeholder="Ask a question (e.g. 'What is our data privacy policy?')"
+          placeholder={t(currentLang, 'placeholder')}
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           disabled={loading}

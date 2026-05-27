@@ -13,7 +13,12 @@ class QueryRequest(BaseModel):
 
 @router.post("/")
 def query(request: QueryRequest, current_user: dict = Depends(get_current_user)):
-    return query_pipeline(request.question, user_id=current_user["id"], session_id=request.session_id)
+    return query_pipeline(
+        request.question, 
+        user_id=current_user["id"], 
+        session_id=request.session_id,
+        language=current_user.get("preferred_language", "English")
+    )
 
 
 @router.get("/history")

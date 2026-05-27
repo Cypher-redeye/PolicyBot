@@ -176,7 +176,7 @@ IMPORTANT INSTRUCTIONS:
 4. If the context doesn't contain enough information to fully answer the question, say what information IS available and mention what's missing.
 5. Be conversational, helpful, and provide specific details from the documents when available.
 6. Don't make up information that isn't in the context.
-7. If the user asks in a non-English language, respond in that same language.
+7. IMPORTANT: ALWAYS respond in {language}.
 8. DO NOT use any markdown formatting, asterisks (like ** or *), or bold text. Keep all text plain and natural-looking.
 
 Context from documents:
@@ -184,9 +184,9 @@ Context from documents:
 
 User Question: {question}
 
-Answer (based on the context above):"""
+Answer (in {language}, based on the context above):"""
 
-        PROMPT = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
+        PROMPT = PromptTemplate(template=prompt_template, input_variables=["context", "question", "language"])
         self.qa_prompt = PROMPT
 
         def format_docs(docs):
@@ -229,7 +229,7 @@ Answer (based on the context above):"""
         if self.bm25:
             self.bm25.add_documents(all_chunks)
 
-    def query(self, question: str, user_id: Optional[str] = None, session_id: Optional[str] = None) -> Dict[str, Any]:
+    def query(self, question: str, user_id: Optional[str] = None, session_id: Optional[str] = None, language: str = "English") -> Dict[str, Any]:
         start_time = time.time()
 
         source_documents = self.hybrid_retriever.invoke(question, user_id=user_id)
@@ -251,7 +251,7 @@ Answer (based on the context above):"""
 
         # Generate answer using the correctly filtered context
         llm_chain = self.qa_prompt | self.llm | StrOutputParser()
-        answer = llm_chain.invoke({"context": context, "question": question})
+        answer = llm_chain.invoke({"context": context, "question": question, "language": language})
 
         # Strip markdown stars (asterisks) to make the text look clean and natural
         if answer:

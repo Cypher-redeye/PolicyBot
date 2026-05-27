@@ -27,3 +27,10 @@ def login_user(email: str, password: str) -> str:
     if not verify_password(password, user["hashed_password"]):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     return create_access_token(subject=user["email"])
+
+
+def update_language(user_id: str, language: str) -> dict:
+    updated = supabase_db.update("users", {"id": user_id}, {"preferred_language": language})
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return updated[0]

@@ -5,6 +5,7 @@ import Home from './pages/Home';
 import Documents from './pages/Documents';
 import Login from './pages/Login';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { t, languages } from './utils/i18n';
 import { 
   LayoutDashboard, 
   MessageSquareCode, 
@@ -18,8 +19,13 @@ import {
 
 // Protected Route Wrapper to enforce JWT sessions
 function ProtectedLayout({ children }) {
-  const { token, user, logout, loading } = useAuth();
+  const { token, user, logout, updateUserLanguage, loading } = useAuth();
   const navigate = useNavigate();
+  const currentLang = user?.preferredLanguage || 'English';
+
+  const handleLangChange = (e) => {
+    updateUserLanguage(e.target.value);
+  };
 
   if (loading) {
     return (
@@ -97,7 +103,7 @@ function ProtectedLayout({ children }) {
           </li>
           <li>
             <NavLink to="/chat" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <MessageSquareCode size={18} /> Chat Assistant
+              <MessageSquareCode size={18} /> {t(currentLang, 'chatAssistant')}
             </NavLink>
           </li>
           <li>
@@ -147,6 +153,25 @@ function ProtectedLayout({ children }) {
               </span>
             </div>
           </div>
+
+          <select 
+            value={currentLang} 
+            onChange={handleLangChange}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--border-line)',
+              background: 'var(--bg-card)',
+              color: 'var(--text-primary)',
+              fontSize: '0.85rem',
+              cursor: 'pointer'
+            }}
+          >
+            {languages.map(lang => (
+              <option key={lang} value={lang}>{lang}</option>
+            ))}
+          </select>
 
           <button 
             onClick={handleLogout}
