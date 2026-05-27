@@ -35,7 +35,8 @@ export function AuthProvider({ children }) {
         setToken(data.access_token);
         const me = await authService.getMe();
         const preferredLanguage = me.preferred_language || 'English';
-        const userData = { username, preferredLanguage };
+        const role = me.role || 'employee';
+        const userData = { username, preferredLanguage, role };
         setUser(userData);
         sessionStorage.setItem('user', JSON.stringify(userData));
       }
