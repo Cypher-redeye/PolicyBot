@@ -12,6 +12,7 @@ class UserResponse(BaseModel):
     email: EmailStr
     is_active: bool
     preferred_language: str = "English"
+    role: str = "employee"
 
     model_config = {"from_attributes": True}
 

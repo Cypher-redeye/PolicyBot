@@ -49,6 +49,10 @@ function ProtectedLayout({ children }) {
     return <Navigate to="/login" replace />;
   }
 
+  if (window.location.pathname === '/documents' && user?.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -106,11 +110,13 @@ function ProtectedLayout({ children }) {
               <MessageSquareCode size={18} /> {t(currentLang, 'chatAssistant')}
             </NavLink>
           </li>
-          <li>
-            <NavLink to="/documents" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <Files size={18} /> Documents
-            </NavLink>
-          </li>
+          {user?.role === 'admin' && (
+            <li>
+              <NavLink to="/documents" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <Files size={18} /> Documents
+              </NavLink>
+            </li>
+          )}
         </nav>
 
 

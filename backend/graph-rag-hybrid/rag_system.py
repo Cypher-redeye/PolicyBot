@@ -196,13 +196,15 @@ IMPORTANT INSTRUCTIONS:
 6. Don't make up information that isn't in the context.
 7. IMPORTANT: ALWAYS respond in {language}.
 8. DO NOT use any markdown formatting, asterisks (like ** or *), or bold text. Keep all text plain and natural-looking.
+9. You MUST output your response as a valid JSON object with EXACTLY two keys: "answer" (your main response string) and "follow_ups" (a list of 3 strings containing suggested follow-up questions the user could ask based on the context).
+10. Return ONLY the JSON object, no backticks, no markdown blocks.
 
 Context from documents:
 {context}
 
 User Question: {question}
 
-Answer (in {language}, based on the context above):"""
+JSON Response (in {language}):"""
 
         PROMPT = PromptTemplate(template=prompt_template, input_variables=["context", "question", "language"])
         self.qa_prompt = PROMPT
@@ -285,10 +287,31 @@ Answer (in {language}, based on the context above):"""
 
         # Generate answer using the correctly filtered context
         llm_chain = self.qa_prompt | self.llm | StrOutputParser()
-        answer = llm_chain.invoke({"context": context, "question": question, "language": language})
+        response_str = llm_chain.invoke({"context": context, "question": question, "language": language})
+
+        answer = response_str
+        follow_ups = []
+
+        import json
+        import re
+        try:
+            parsed = json.loads(response_str)
+            if isinstance(parsed, dict):
+                answer = parsed.get("answer", response_str)
+                follow_ups = parsed.get("follow_ups", [])
+        except json.JSONDecodeError:
+            match = re.search(r'```(?:json)?\s*(.*?)\s*```', response_str, re.DOTALL)
+            if match:
+                try:
+                    parsed = json.loads(match.group(1))
+                    if isinstance(parsed, dict):
+                        answer = parsed.get("answer", response_str)
+                        follow_ups = parsed.get("follow_ups", [])
+                except json.JSONDecodeError:
+                    pass
 
         # Strip markdown stars (asterisks) to make the text look clean and natural
-        if answer:
+        if answer and isinstance(answer, str):
             answer = answer.replace("**", "").replace("*", "")
             
         execution_time = time.time() - start_time
@@ -308,6 +331,7 @@ Answer (in {language}, based on the context above):"""
             "answer": answer,
             "sources": sources,
             "num_sources": len(sources),
+            "follow_ups": follow_ups,
             "execution_time": execution_time,
         }
 

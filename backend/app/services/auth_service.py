@@ -15,6 +15,7 @@ def register_user(data: UserCreate) -> dict:
         "hashed_password": hash_password(data.password),
         "is_active": True,
         "is_superuser": False,
+        "role": "employee"
     })
     return user
 

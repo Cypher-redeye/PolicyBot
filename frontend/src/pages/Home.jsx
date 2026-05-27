@@ -8,7 +8,11 @@ import {
   Trash2, 
   BookOpen, 
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Download,
+  Mic,
+  MicOff,
+  Volume2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { t } from '../utils/i18n';
@@ -24,6 +28,7 @@ export default function Home() {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [expandedCitationIdx, setExpandedCitationIdx] = useState(null);
+  const [isListening, setIsListening] = useState(false);
   
   const messagesEndRef = useRef(null);
 
@@ -115,6 +120,7 @@ export default function Home() {
       
       const botReply = response.answer || "I could not find an answer in the uploaded documents. Please try rephrasing your question.";
       const citations = response.sources || [];
+      const followUps = response.follow_ups || [];
 
       setMessages(prev => [
         ...prev,
@@ -122,6 +128,7 @@ export default function Home() {
           sender: 'bot',
           text: botReply,
           citations: citations,
+          followUps: followUps,
           timestamp: new Date()
         }
       ]);
@@ -139,6 +146,55 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFollowUpClick = (question) => {
+    setInputText(question);
+    // Need a tiny timeout to let state update before sending
+    setTimeout(() => {
+      document.getElementById('send-form').dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    }, 100);
+  };
+
+  const toggleListen = () => {
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Your browser does not support Voice Input. Try Chrome or Edge.");
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US'; // Could map currentLang to BCP-47 tags
+    recognition.onstart = () => setIsListening(true);
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setInputText(transcript);
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+    recognition.start();
+  };
+
+  const speakText = (text) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const exportChat = () => {
+    const textContent = messages.map(m => `[${m.timestamp.toLocaleTimeString()}] ${m.sender.toUpperCase()}: ${m.text}`).join('\n\n');
+    const blob = new Blob([textContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `PolicyBot_Chat_${new Date().toISOString().split('T')[0]}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const clearChat = async () => {
@@ -183,27 +239,49 @@ export default function Home() {
           </p>
         </div>
 
-        <button 
-          onClick={clearChat}
-          style={{
-            background: '#fef2f2',
-            border: '1px solid #fee2e2',
-            color: '#ef4444',
-            padding: '8px 16px',
-            borderRadius: 'var(--radius-sm)',
-            cursor: 'pointer',
-            fontSize: '0.85rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontWeight: '500',
-            transition: 'var(--transition-fast)'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.background = '#fee2e2'}
-          onMouseLeave={(e) => e.currentTarget.style.background = '#fef2f2'}
-        >
-          <Trash2 size={16} /> {t(currentLang, 'clearChat') || 'Delete Chat'}
-        </button>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button 
+            onClick={exportChat}
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-line)',
+              color: 'var(--text-primary)',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius-sm)',
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontWeight: '500',
+              transition: 'var(--transition-fast)'
+            }}
+          >
+            <Download size={16} /> Export
+          </button>
+          
+          <button 
+            onClick={clearChat}
+            style={{
+              background: '#fef2f2',
+              border: '1px solid #fee2e2',
+              color: '#ef4444',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius-sm)',
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontWeight: '500',
+              transition: 'var(--transition-fast)'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = '#fee2e2'}
+            onMouseLeave={(e) => e.currentTarget.style.background = '#fef2f2'}
+          >
+            <Trash2 size={16} /> {t(currentLang, 'clearChat') || 'Delete Chat'}
+          </button>
+        </div>
       </div>
 
       {/* Messages Scroll Area */}
@@ -229,9 +307,23 @@ export default function Home() {
               }}
             >
               {msg.sender === 'user' ? <User size={14} /> : <Bot size={14} />}
-              <span className="label-eyebrow" style={{ fontSize: '10px', color: 'inherit' }}>
+              <span className="label-eyebrow" style={{ fontSize: '10px', color: 'inherit', flex: 1 }}>
                 {msg.sender === 'user' ? 'YOU' : 'PolicyBot'}
               </span>
+              {msg.sender === 'bot' && !msg.isError && (
+                <button 
+                  onClick={() => speakText(msg.text)}
+                  title="Read Aloud"
+                  style={{
+                    background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: '4px',
+                    opacity: 0.6
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+                  onMouseLeave={(e) => e.currentTarget.style.opacity = 0.6}
+                >
+                  <Volume2 size={14} />
+                </button>
+              )}
             </div>
 
             {/* Answer body */}
@@ -269,7 +361,7 @@ export default function Home() {
                       >
                         <div className="flex-between" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                           <span style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.85rem' }}>
-                            {cite.document_name || 'Policy Document'}
+                            {cite.document_name || cite.metadata?.name || 'Policy Document'}
                           </span>
                         </div>
                         <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
@@ -279,6 +371,38 @@ export default function Home() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Smart Follow-Ups */}
+            {msg.followUps && msg.followUps.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '16px' }}>
+                {msg.followUps.map((q, fIdx) => (
+                  <button
+                    key={fIdx}
+                    onClick={() => handleFollowUpClick(q)}
+                    style={{
+                      background: 'var(--bg-card-secondary)',
+                      border: '1px solid var(--border-line)',
+                      color: 'var(--text-primary)',
+                      padding: '6px 12px',
+                      borderRadius: '16px',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      transition: 'border-color 0.2s, color 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--accent-gold)';
+                      e.currentTarget.style.color = 'var(--accent-gold)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--border-line)';
+                      e.currentTarget.style.color = 'var(--text-primary)';
+                    }}
+                  >
+                    {q}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -330,21 +454,41 @@ export default function Home() {
       </div>
 
       {/* Message input tray */}
-      <form onSubmit={handleSend} style={{ marginTop: '20px', display: 'flex', gap: '16px' }}>
+      <form id="send-form" onSubmit={handleSend} style={{ marginTop: '20px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <button
+          type="button"
+          onClick={toggleListen}
+          title="Voice Input"
+          style={{
+            background: isListening ? '#fee2e2' : 'var(--bg-card)',
+            border: `1px solid ${isListening ? '#ef4444' : 'var(--border-line)'}`,
+            color: isListening ? '#ef4444' : 'var(--text-secondary)',
+            width: '48px',
+            height: '48px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+        </button>
         <input
           type="text"
           className="form-input"
-          placeholder={t(currentLang, 'placeholder')}
+          placeholder={isListening ? "Listening..." : t(currentLang, 'placeholder')}
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          disabled={loading}
+          disabled={loading || isListening}
           style={{ flex: 1, padding: '14px', borderRadius: 'var(--radius-sm)' }}
         />
         <button 
           type="submit" 
           className="gold-btn"
           disabled={loading || !inputText.trim()}
-          style={{ padding: '0 24px', borderRadius: 'var(--radius-sm)' }}
+          style={{ padding: '0 24px', borderRadius: 'var(--radius-sm)', height: '48px' }}
         >
           <Send size={18} />
         </button>
