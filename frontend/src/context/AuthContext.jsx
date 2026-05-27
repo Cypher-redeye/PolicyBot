@@ -8,10 +8,10 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Hydrate auth status from localStorage on initial render
+  // Hydrate auth status from sessionStorage on initial render
   useEffect(() => {
     try {
-      const storedToken = localStorage.getItem('token');
+      const storedToken = sessionStorage.getItem('token');
       const storedUser = authService.getCurrentUser();
       if (storedToken && storedUser) {
         setToken(storedToken);
@@ -20,8 +20,8 @@ export function AuthProvider({ children }) {
     } catch (err) {
       console.error('Failed to parse active user session:', err);
       // Clean up corrupt session
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
     } finally {
       setLoading(false);
     }
@@ -37,7 +37,7 @@ export function AuthProvider({ children }) {
         const preferredLanguage = me.preferred_language || 'English';
         const userData = { username, preferredLanguage };
         setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
+        sessionStorage.setItem('user', JSON.stringify(userData));
       }
       return data;
     } catch (err) {
@@ -53,7 +53,7 @@ export function AuthProvider({ children }) {
       await authService.updateLanguage(language);
       const newUserData = { ...user, preferredLanguage: language };
       setUser(newUserData);
-      localStorage.setItem('user', JSON.stringify(newUserData));
+      sessionStorage.setItem('user', JSON.stringify(newUserData));
     } catch (err) {
       console.error('Failed to update language', err);
     }

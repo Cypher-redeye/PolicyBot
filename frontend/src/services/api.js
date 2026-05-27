@@ -49,7 +49,7 @@ export function logApiCall(method, url, status, latency) {
 api.interceptors.request.use(
   (config) => {
     config.metadata = { startTime: new Date() };
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -107,8 +107,8 @@ export const authService = {
       const latency = new Date() - startTime;
       logApiCall('POST', '/v1/auth/login', '200 OK', latency);
       if (response.data.access_token) {
-        localStorage.setItem('token', response.data.access_token);
-        localStorage.setItem('user', JSON.stringify({ username }));
+        sessionStorage.setItem('token', response.data.access_token);
+        sessionStorage.setItem('user', JSON.stringify({ username }));
       }
       return response.data;
     } catch (err) {
@@ -136,11 +136,11 @@ export const authService = {
     }
   },
   logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
   },
   getCurrentUser: () => {
-    const user = localStorage.getItem('user');
+    const user = sessionStorage.getItem('user');
     return user ? JSON.parse(user) : null;
   },
   getMe: async () => {
