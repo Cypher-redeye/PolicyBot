@@ -13,9 +13,9 @@ import {
   LogOut, 
   ShieldAlert,
   Terminal,
-  Bot,
-  Shield
+  Bot
 } from 'lucide-react';
+import Logo from './components/Logo';
 
 // Protected Route Wrapper to enforce JWT sessions
 function ProtectedLayout({ children }) {
@@ -83,7 +83,7 @@ function ProtectedLayout({ children }) {
               justifyContent: 'center'
             }}
           >
-            <Shield size={20} />
+            <Logo size={24} />
           </div>
           <div>
             <h1 style={{ fontSize: '1.25rem', fontWeight: '800', lineHeight: 1, color: 'var(--text-primary)' }}>

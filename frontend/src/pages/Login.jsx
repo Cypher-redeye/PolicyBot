@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Shield, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
+import Logo from '../components/Logo';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -72,7 +73,7 @@ export default function Login() {
               justifyContent: 'center'
             }}
           >
-            <Shield size={28} />
+            <Logo size={32} />
           </div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: '700', marginBottom: '8px', color: 'var(--text-primary)' }}>
             {isRegister ? 'Create an Account' : 'Welcome Back'}
