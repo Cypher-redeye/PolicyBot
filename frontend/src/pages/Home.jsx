@@ -12,7 +12,10 @@ import {
   Download,
   Mic,
   MicOff,
-  Volume2
+  Volume2,
+  Pause,
+  Play,
+  Square
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { t } from '../utils/i18n';
@@ -29,6 +32,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [expandedCitationIdx, setExpandedCitationIdx] = useState(null);
   const [isListening, setIsListening] = useState(false);
+  const [playingMsgIdx, setPlayingMsgIdx] = useState(null);
+  const [isPaused, setIsPaused] = useState(false);
   
   const messagesEndRef = useRef(null);
 
@@ -166,8 +171,22 @@ export default function Home() {
       alert("Your browser does not support Voice Input. Try Chrome or Edge.");
       return;
     }
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US'; // Could map currentLang to BCP-47 tags
+    const getLangCode = (lang) => {
+      const map = {
+        'Hindi': 'hi-IN',
+        'Tamil': 'ta-IN',
+        'Telugu': 'te-IN',
+        'Bengali': 'bn-IN',
+        'Marathi': 'mr-IN',
+        'Gujarati': 'gu-IN',
+        'Kannada': 'kn-IN',
+        'Malayalam': 'ml-IN',
+        'Punjabi': 'pa-IN',
+        'English': 'en-US'
+      };
+      return map[lang] || 'en-US';
+    };
+    recognition.lang = getLangCode(currentLang);
     recognition.onstart = () => setIsListening(true);
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
@@ -178,13 +197,83 @@ export default function Home() {
     recognition.start();
   };
 
-  const speakText = (text) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      window.speechSynthesis.speak(utterance);
+  const getVoiceForLang = (langCode) => {
+    const voices = window.speechSynthesis.getVoices();
+    // Try to find a voice that exactly matches the lang code (e.g., 'hi-IN')
+    let voice = voices.find(v => v.lang === langCode);
+    if (!voice) {
+      // Fallback to partial match (e.g., 'hi')
+      voice = voices.find(v => v.lang.startsWith(langCode.split('-')[0]));
     }
+    return voice || null;
   };
+
+  const speakText = (text, idx) => {
+    if (!('speechSynthesis' in window)) return;
+
+    // If currently speaking this exact message
+    if (playingMsgIdx === idx) {
+      if (isPaused) {
+        window.speechSynthesis.resume();
+        setIsPaused(false);
+      } else {
+        window.speechSynthesis.pause();
+        setIsPaused(true);
+      }
+      return;
+    }
+
+    // Stop anything currently playing
+    window.speechSynthesis.cancel();
+    setIsPaused(false);
+    setPlayingMsgIdx(idx);
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    const langMap = {
+      'Hindi': 'hi-IN',
+      'Tamil': 'ta-IN',
+      'Telugu': 'te-IN',
+      'Bengali': 'bn-IN',
+      'Marathi': 'mr-IN',
+      'Gujarati': 'gu-IN',
+      'Kannada': 'kn-IN',
+      'Malayalam': 'ml-IN',
+      'Punjabi': 'pa-IN',
+      'English': 'en-US'
+    };
+    const targetLang = langMap[currentLang] || 'en-US';
+    utterance.lang = targetLang;
+    
+    const voice = getVoiceForLang(targetLang);
+    if (voice) {
+      utterance.voice = voice;
+    }
+
+    utterance.onend = () => {
+      setPlayingMsgIdx(null);
+      setIsPaused(false);
+    };
+    utterance.onerror = () => {
+      setPlayingMsgIdx(null);
+      setIsPaused(false);
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const stopSpeaking = () => {
+    window.speechSynthesis.cancel();
+    setPlayingMsgIdx(null);
+    setIsPaused(false);
+  };
+
+  // Ensure voices are loaded (Chrome sometimes needs this to populate voices)
+  useEffect(() => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.getVoices();
+    }
+  }, []);
 
   const exportChat = () => {
     const textContent = messages.map(m => `[${m.timestamp.toLocaleTimeString()}] ${m.sender.toUpperCase()}: ${m.text}`).join('\n\n');
@@ -311,18 +400,36 @@ export default function Home() {
                 {msg.sender === 'user' ? 'YOU' : 'PolicyBot'}
               </span>
               {msg.sender === 'bot' && !msg.isError && (
-                <button 
-                  onClick={() => speakText(msg.text)}
-                  title="Read Aloud"
-                  style={{
-                    background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: '4px',
-                    opacity: 0.6
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
-                  onMouseLeave={(e) => e.currentTarget.style.opacity = 0.6}
-                >
-                  <Volume2 size={14} />
-                </button>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {playingMsgIdx === idx ? (
+                    <>
+                      <button 
+                        onClick={() => speakText(msg.text, idx)}
+                        title={isPaused ? "Resume" : "Pause"}
+                        style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: '4px', opacity: 0.8 }}
+                      >
+                        {isPaused ? <Play size={14} /> : <Pause size={14} />}
+                      </button>
+                      <button 
+                        onClick={stopSpeaking}
+                        title="Stop"
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px', opacity: 0.8 }}
+                      >
+                        <Square size={14} fill="currentColor" />
+                      </button>
+                    </>
+                  ) : (
+                    <button 
+                      onClick={() => speakText(msg.text, idx)}
+                      title="Read Aloud"
+                      style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: '4px', opacity: 0.6 }}
+                      onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+                      onMouseLeave={(e) => e.currentTarget.style.opacity = 0.6}
+                    >
+                      <Volume2 size={14} />
+                    </button>
+                  )}
+                </div>
               )}
             </div>
 
