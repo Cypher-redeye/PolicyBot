@@ -15,7 +15,7 @@ export const translations = {
   English: {
     greeting: "Hello! I am PolicyBot. Ask me any question regarding your corporate policies, security guidelines, or operational manuals.",
     placeholder: "Ask a question (e.g. 'What is our data privacy policy?')",
-    clearChat: "Clear Chat",
+    clearChat: "Delete Chat",
     chatAssistant: "Chat Assistant",
     chatSubtitle: "Ask questions about your company policies and get instant answers."
   },

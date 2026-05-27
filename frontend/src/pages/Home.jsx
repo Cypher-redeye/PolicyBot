@@ -141,13 +141,20 @@ export default function Home() {
     }
   };
 
-  const clearChat = () => {
+  const clearChat = async () => {
+    if (sessionId) {
+      try {
+        await queryService.deleteSession(sessionId);
+      } catch (err) {
+        console.error("Failed to delete chat", err);
+      }
+    }
     setSessionId(null);
     navigate('/chat', { replace: true });
     setMessages([
       {
         sender: 'bot',
-        text: "Chat cleared. What else would you like to know?",
+        text: "Chat deleted. What else would you like to know?",
         timestamp: new Date(),
       }
     ]);
@@ -195,7 +202,7 @@ export default function Home() {
           onMouseEnter={(e) => e.currentTarget.style.background = '#fee2e2'}
           onMouseLeave={(e) => e.currentTarget.style.background = '#fef2f2'}
         >
-          <Trash2 size={16} /> {t(currentLang, 'clearChat')}
+          <Trash2 size={16} /> {t(currentLang, 'clearChat') || 'Delete Chat'}
         </button>
       </div>
 

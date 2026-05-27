@@ -317,6 +317,9 @@ Answer (in {language}, based on the context above):"""
     def get_conversation_history(self, session_id: str, limit: int = 20) -> List[Dict]:
         return self.logger.get_conversation_history(session_id, limit)
 
+    def delete_session(self, session_id: str, user_id: str) -> None:
+        self.logger.delete_session(session_id, user_id)
+
     def get_documents(self) -> List[Dict]:
         return self.logger.get_all_documents()
 

@@ -29,3 +29,11 @@ def get_history(
 ):
     return get_rag().get_history(limit=limit, user_id=current_user["id"], session_id=session_id)
 
+
+@router.delete("/{session_id}")
+def delete_session(
+    session_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    get_rag().delete_session(session_id=session_id, user_id=current_user["id"])
+    return {"status": "success", "message": "Session deleted"}

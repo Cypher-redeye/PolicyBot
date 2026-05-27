@@ -191,6 +191,10 @@ export const queryService = {
   },
   getSessionHistory: async (session_id) => {
     return queryService.getRecentQueries(100, session_id);
+  },
+  deleteSession: async (session_id) => {
+    const response = await api.delete(`/v1/query/${session_id}`);
+    return response.data;
   }
 };
 

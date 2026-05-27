@@ -70,6 +70,16 @@ class SupabaseLogger:
     def get_conversation_history(self, session_id: str, limit: int = 20, user_id: Optional[str] = None) -> List[Dict]:
         return self.get_recent_queries(limit=limit, user_id=user_id, session_id=session_id)
 
+    def delete_session(self, session_id: str, user_id: str) -> None:
+        if not self._available:
+            return
+        try:
+            params = {"session_id": f"eq.{session_id}", "user_id": f"eq.{user_id}"}
+            r = httpx.delete(self._rest("query_logs"), params=params, headers=self._headers(), timeout=10)
+            r.raise_for_status()
+        except Exception as e:
+            print(f"Warning: Failed to delete session ({e})")
+
     def get_all_documents(self) -> List[Dict]:
         return []
 
