@@ -343,3 +343,126 @@ h1, h2, h3, h4, h5, h6 {
 .pulse-dot {
   display: none; /* Hide the pulse dot for a simpler UI */
 }
+
+/* Responsive Design */
+.mobile-header {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-line);
+  z-index: 80;
+  align-items: center;
+  padding: 0 20px;
+  justify-content: space-between;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.mobile-menu-btn {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  margin-left: -8px;
+}
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 90;
+  backdrop-filter: blur(2px);
+}
+
+.sidebar-overlay.open {
+  display: block;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+.documents-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+  }
+  
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .main-content {
+    margin-left: 0;
+    padding: 20px;
+    padding-top: 80px; /* Space for mobile header */
+  }
+
+  .mobile-header {
+    display: flex;
+  }
+
+  /* Adjust grid layouts */
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .dashboard-grid, .documents-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  /* Chat layout adjustments */
+  .chat-container {
+    height: calc(100vh - 100px);
+  }
+  
+  .message-bubble {
+    max-width: 90%;
+  }
+
+  .title-large {
+    font-size: 1.5rem;
+  }
+  
+  .flex-between {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 12px;
+  }
+  
+  .flex-between > div:last-child {
+    align-self: flex-start;
+  }
+
+  .chat-container .flex-between {
+    flex-direction: row;
+    align-items: center !important;
+  }
+  
+  .chat-container .flex-between > div:last-child {
+    align-self: center;
+  }
+}
+

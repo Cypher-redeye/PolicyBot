@@ -170,7 +170,7 @@ export default function Documents() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', alignItems: 'start' }}>
+      <div className="documents-grid">
         {/* Upload Form Box */}
         <div className="bento" style={{ padding: '32px' }}>
           <h3 style={{ fontSize: '1.25rem', marginBottom: '8px', fontWeight: '600' }}>

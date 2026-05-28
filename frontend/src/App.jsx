@@ -13,7 +13,8 @@ import {
   LogOut, 
   ShieldAlert,
   Terminal,
-  Bot
+  Bot,
+  Menu
 } from 'lucide-react';
 import Logo from './components/Logo';
 
@@ -22,6 +23,7 @@ function ProtectedLayout({ children }) {
   const { token, user, logout, updateUserLanguage, loading } = useAuth();
   const navigate = useNavigate();
   const currentLang = user?.preferredLanguage || 'English';
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const handleLangChange = (e) => {
     updateUserLanguage(e.target.value);
@@ -60,8 +62,25 @@ function ProtectedLayout({ children }) {
 
   return (
     <div className="app-container">
+      {/* Mobile Header */}
+      <div className="mobile-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+          <Logo size={20} />
+          <span style={{ fontWeight: '800', fontSize: '1.1rem' }}>PolicyBot</span>
+        </div>
+        <button className="mobile-menu-btn" onClick={() => setIsSidebarOpen(true)}>
+          <Menu size={24} />
+        </button>
+      </div>
+
+      {/* Sidebar Overlay */}
+      <div 
+        className={`sidebar-overlay ${isSidebarOpen ? 'open' : ''}`}
+        onClick={() => setIsSidebarOpen(false)}
+      />
+
       {/* Sidebar Navigation Drawer */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
         <div 
           className="flex" 
           style={{ 
@@ -101,18 +120,18 @@ function ProtectedLayout({ children }) {
 
         <nav className="nav-menu">
           <li>
-            <NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} end>
+            <NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} end onClick={() => setIsSidebarOpen(false)}>
               <LayoutDashboard size={18} /> Dashboard
             </NavLink>
           </li>
           <li>
-            <NavLink to="/chat" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <NavLink to="/chat" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} onClick={() => setIsSidebarOpen(false)}>
               <MessageSquareCode size={18} /> {t(currentLang, 'chatAssistant')}
             </NavLink>
           </li>
           {user?.role === 'admin' && (
             <li>
-              <NavLink to="/documents" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <NavLink to="/documents" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} onClick={() => setIsSidebarOpen(false)}>
                 <Files size={18} /> Documents
               </NavLink>
             </li>

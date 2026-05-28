@@ -109,14 +109,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div 
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '2fr 1fr',
-          gap: '32px',
-          alignItems: 'start'
-        }}
-      >
+      <div className="dashboard-grid">
         {/* Recent Queries */}
         <div className="bento" style={{ padding: '32px' }}>
           <div className="flex-between" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', alignItems: 'center' }}>
