@@ -45,7 +45,7 @@
 <img src="./screenshots/login.png" alt="Login" width="800">
 </details>
 
-*(Note: Add the screenshots provided to a `screenshots` folder in the repository root to display them here.)*
+
 
 ---
 
