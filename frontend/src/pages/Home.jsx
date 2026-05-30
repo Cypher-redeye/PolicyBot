@@ -206,16 +206,14 @@ export default function Home() {
     const normalizedTarget = langCode.replace('_', '-').toLowerCase();
     const targetBase = normalizedTarget.split('-')[0];
     
-    // 1. Exact match (case insensitive, allowing _ or -)
-    let voice = voices.find(v => v.lang.replace('_', '-').toLowerCase() === normalizedTarget);
+    // 1. Find all matching voices based on lang code
+    let matchingVoices = voices.filter(v => {
+      const vLang = v.lang.replace('_', '-').toLowerCase();
+      return vLang === normalizedTarget || vLang.startsWith(targetBase);
+    });
     
-    // 2. Base language match (e.g. 'hi' matches 'hi-IN', 'hi')
-    if (!voice) {
-      voice = voices.find(v => v.lang.replace('_', '-').toLowerCase().startsWith(targetBase));
-    }
-    
-    // 3. Fallback to matching language name in voice name (e.g., "Google हिन्दी" on Android)
-    if (!voice) {
+    // 2. Fallback to matching language name in voice name (e.g., "Google हिन्दी")
+    if (matchingVoices.length === 0) {
       const langNames = {
         'hi': ['hindi', 'हिन्दी'],
         'ta': ['tamil', 'தமிழ்'],
@@ -225,15 +223,38 @@ export default function Home() {
         'gu': ['gujarati', 'ગુજરાતી'],
         'kn': ['kannada', 'ಕನ್ನಡ'],
         'ml': ['malayalam', 'മലയാളം'],
-        'pa': ['punjabi', 'ਪੰਜਾਬੀ']
+        'pa': ['punjabi', 'ਪੰਜਾਬੀ'],
+        'en': ['english']
       };
       const namesToMatch = langNames[targetBase];
       if (namesToMatch) {
-        voice = voices.find(v => namesToMatch.some(name => v.name.toLowerCase().includes(name)));
+        matchingVoices = voices.filter(v => namesToMatch.some(name => v.name.toLowerCase().includes(name)));
       }
     }
     
-    return voice || null;
+    if (matchingVoices.length === 0) return null;
+
+    // 3. Score voices to pick the most natural sounding one
+    matchingVoices.sort((a, b) => {
+      const aName = a.name.toLowerCase();
+      const bName = b.name.toLowerCase();
+      
+      let aScore = 0;
+      let bScore = 0;
+
+      // Prefer cloud/natural voices (Edge Natural, Google, Premium)
+      if (aName.includes('natural') || aName.includes('online')) aScore += 10;
+      if (aName.includes('google')) aScore += 8;
+      if (aName.includes('premium')) aScore += 5;
+      
+      if (bName.includes('natural') || bName.includes('online')) bScore += 10;
+      if (bName.includes('google')) bScore += 8;
+      if (bName.includes('premium')) bScore += 5;
+
+      return bScore - aScore;
+    });
+    
+    return matchingVoices[0];
   };
 
   const speakText = (text, idx) => {
