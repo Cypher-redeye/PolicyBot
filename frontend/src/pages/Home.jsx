@@ -354,20 +354,19 @@ export default function Home() {
 
     utterance.onstart = () => {
       setSpokenWordRange({ msgIdx: idx, start: null, length: null });
-      // If voice is a cloud voice, it likely won't fire onboundary. So we simulate it.
-      if (voice && !voice.localService) {
-        simulateHighlight();
-      }
+      // Start simulation unconditionally. 
+      // If the browser natively supports word boundaries, it will cancel this timer on the first 'word' event.
+      simulateHighlight();
     };
 
     utterance.onboundary = (event) => {
-      // If the browser fires onboundary naturally, we use it (timer is either not started or we can clear it)
-      if (highlightTimerRef.current) {
-        clearTimeout(highlightTimerRef.current);
-        highlightTimerRef.current = null;
-      }
-      
-      if (event.name === 'word' || event.name === 'sentence') {
+      if (event.name === 'word') {
+        // We only cancel the simulation if the browser explicitly proves it supports 'word' boundaries.
+        if (highlightTimerRef.current) {
+          clearTimeout(highlightTimerRef.current);
+          highlightTimerRef.current = null;
+        }
+        
         let length = event.charLength;
         if (!length || length === 0) {
           const remainingText = text.substring(event.charIndex);
@@ -375,6 +374,9 @@ export default function Home() {
           length = match ? match[0].length : 1;
         }
         setSpokenWordRange({ msgIdx: idx, start: event.charIndex, length });
+      } else if (event.name === 'sentence') {
+        // Some voices only fire sentence boundaries. Do not cancel the word simulation here.
+        // We can ignore sentence boundaries to let the word simulator keep running.
       }
     };
 
@@ -391,6 +393,8 @@ export default function Home() {
       setSpokenWordRange({ msgIdx: null, start: null, length: null });
     };
 
+    // Assign to window to prevent Chrome's garbage collection from killing the utterance prematurely
+    window.currentUtterance = utterance;
     window.speechSynthesis.speak(utterance);
   };
 
