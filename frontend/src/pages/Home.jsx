@@ -200,12 +200,39 @@ export default function Home() {
 
   const getVoiceForLang = (langCode) => {
     const voices = window.speechSynthesis.getVoices();
-    // Try to find a voice that exactly matches the lang code (e.g., 'hi-IN')
-    let voice = voices.find(v => v.lang === langCode);
+    if (!voices || voices.length === 0) return null;
+    
+    // Normalize target (e.g. 'hi-IN' -> 'hi-in')
+    const normalizedTarget = langCode.replace('_', '-').toLowerCase();
+    const targetBase = normalizedTarget.split('-')[0];
+    
+    // 1. Exact match (case insensitive, allowing _ or -)
+    let voice = voices.find(v => v.lang.replace('_', '-').toLowerCase() === normalizedTarget);
+    
+    // 2. Base language match (e.g. 'hi' matches 'hi-IN', 'hi')
     if (!voice) {
-      // Fallback to partial match (e.g., 'hi')
-      voice = voices.find(v => v.lang.startsWith(langCode.split('-')[0]));
+      voice = voices.find(v => v.lang.replace('_', '-').toLowerCase().startsWith(targetBase));
     }
+    
+    // 3. Fallback to matching language name in voice name (e.g., "Google हिन्दी" on Android)
+    if (!voice) {
+      const langNames = {
+        'hi': ['hindi', 'हिन्दी'],
+        'ta': ['tamil', 'தமிழ்'],
+        'te': ['telugu', 'తెలుగు'],
+        'bn': ['bengali', 'বাংলা'],
+        'mr': ['marathi', 'मराठी'],
+        'gu': ['gujarati', 'ગુજરાતી'],
+        'kn': ['kannada', 'ಕನ್ನಡ'],
+        'ml': ['malayalam', 'മലയാളം'],
+        'pa': ['punjabi', 'ਪੰਜਾਬੀ']
+      };
+      const namesToMatch = langNames[targetBase];
+      if (namesToMatch) {
+        voice = voices.find(v => namesToMatch.some(name => v.name.toLowerCase().includes(name)));
+      }
+    }
+    
     return voice || null;
   };
 
