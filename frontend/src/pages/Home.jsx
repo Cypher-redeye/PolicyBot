@@ -15,7 +15,8 @@ import {
   Volume2,
   Pause,
   Play,
-  Square
+  Square,
+  Settings2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { t } from '../utils/i18n';
@@ -35,6 +36,10 @@ export default function Home() {
   const [isListening, setIsListening] = useState(false);
   const [playingMsgIdx, setPlayingMsgIdx] = useState(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [speechRate, setSpeechRate] = useState(1);
+  const [speechPitch, setSpeechPitch] = useState(1);
+  const [showSpeechSettings, setShowSpeechSettings] = useState(false);
+  const [spokenWordRange, setSpokenWordRange] = useState({ msgIdx: null, start: null, length: null });
   
   const messagesEndRef = useRef(null);
 
@@ -314,19 +319,33 @@ export default function Home() {
     }
 
     utterance.lang = targetLang;
+    utterance.rate = speechRate;
+    utterance.pitch = speechPitch;
     
     const voice = getVoiceForLang(targetLang);
     if (voice) {
       utterance.voice = voice;
     }
 
+    utterance.onstart = () => {
+      setSpokenWordRange({ msgIdx: idx, start: 0, length: 0 });
+    };
+
+    utterance.onboundary = (event) => {
+      if (event.name === 'word') {
+        setSpokenWordRange({ msgIdx: idx, start: event.charIndex, length: event.charLength });
+      }
+    };
+
     utterance.onend = () => {
       setPlayingMsgIdx(null);
       setIsPaused(false);
+      setSpokenWordRange({ msgIdx: null, start: null, length: null });
     };
     utterance.onerror = () => {
       setPlayingMsgIdx(null);
       setIsPaused(false);
+      setSpokenWordRange({ msgIdx: null, start: null, length: null });
     };
 
     window.speechSynthesis.speak(utterance);
@@ -336,6 +355,7 @@ export default function Home() {
     window.speechSynthesis.cancel();
     setPlayingMsgIdx(null);
     setIsPaused(false);
+    setSpokenWordRange({ msgIdx: null, start: null, length: null });
   };
 
   // Ensure voices are loaded (Chrome sometimes needs this to populate voices)
@@ -438,6 +458,26 @@ export default function Home() {
 
         <div style={{ display: 'flex', gap: '12px' }}>
           <button 
+            onClick={() => setShowSpeechSettings(!showSpeechSettings)}
+            style={{
+              background: showSpeechSettings ? 'var(--bg-card-secondary)' : 'var(--bg-card)',
+              border: '1px solid var(--border-line)',
+              color: 'var(--text-primary)',
+              padding: '8px 12px',
+              borderRadius: 'var(--radius-sm)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.85rem',
+              transition: 'var(--transition-fast)'
+            }}
+            title="Speech Settings"
+          >
+            <Settings2 size={16} />
+          </button>
+
+          <button 
             onClick={exportChat}
             style={{
               background: 'var(--bg-card)',
@@ -480,6 +520,47 @@ export default function Home() {
           </button>
         </div>
       </div>
+
+      {/* Speech Settings Panel */}
+      {showSpeechSettings && (
+        <div style={{ 
+          marginBottom: '20px', 
+          padding: '16px', 
+          background: 'var(--bg-card)', 
+          border: '1px solid var(--border-line)', 
+          borderRadius: 'var(--radius-sm)',
+          display: 'flex',
+          gap: '24px',
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '200px' }}>
+            <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+              <span>Speech Speed</span>
+              <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{speechRate}x</span>
+            </label>
+            <input 
+              type="range" 
+              min="0.5" max="2" step="0.25" 
+              value={speechRate} 
+              onChange={(e) => setSpeechRate(parseFloat(e.target.value))}
+              style={{ accentColor: 'var(--accent-gold)' }}
+            />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '200px' }}>
+            <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+              <span>Voice Pitch</span>
+              <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{speechPitch}</span>
+            </label>
+            <input 
+              type="range" 
+              min="0.5" max="2" step="0.25" 
+              value={speechPitch} 
+              onChange={(e) => setSpeechPitch(parseFloat(e.target.value))}
+              style={{ accentColor: 'var(--accent-gold)' }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Messages Scroll Area */}
       <div className="chat-messages">
@@ -542,7 +623,17 @@ export default function Home() {
             </div>
 
             {/* Answer body */}
-            <p style={{ fontSize: '0.95rem', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{msg.text}</p>
+            {playingMsgIdx === idx && spokenWordRange.msgIdx === idx && spokenWordRange.start !== null ? (
+              <p style={{ fontSize: '0.95rem', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
+                {msg.text.substring(0, spokenWordRange.start)}
+                <span style={{ backgroundColor: 'rgba(242, 187, 68, 0.4)', borderRadius: '2px', padding: '0 2px', color: '#000' }}>
+                  {msg.text.substring(spokenWordRange.start, spokenWordRange.start + spokenWordRange.length)}
+                </span>
+                {msg.text.substring(spokenWordRange.start + spokenWordRange.length)}
+              </p>
+            ) : (
+              <p style={{ fontSize: '0.95rem', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{msg.text}</p>
+            )}
 
             {/* Knowledge Citations Drawer */}
             {msg.citations && msg.citations.length > 0 && (
