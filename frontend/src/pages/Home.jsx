@@ -42,6 +42,7 @@ export default function Home() {
   const [spokenWordRange, setSpokenWordRange] = useState({ msgIdx: null, start: null, length: null });
   
   const messagesEndRef = useRef(null);
+  const highlightTimerRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -327,18 +328,49 @@ export default function Home() {
       utterance.voice = voice;
     }
 
+    const tokens = text.match(/[\s]+|[^\s]+/g) || [];
+    let currentTokenIndex = 0;
+    let charOffset = 0;
+    
+    const simulateHighlight = () => {
+      if (currentTokenIndex >= tokens.length) return;
+      
+      const token = tokens[currentTokenIndex];
+      const tokenLength = token.length;
+      
+      if (token.trim().length > 0) {
+        setSpokenWordRange({ msgIdx: idx, start: charOffset, length: tokenLength });
+      }
+      
+      charOffset += tokenLength;
+      currentTokenIndex++;
+      
+      // Calculate delay based on token length and speech rate
+      const charsPerSec = 15 * speechRate;
+      const delay = Math.max(150, (tokenLength / charsPerSec) * 1000);
+      
+      highlightTimerRef.current = setTimeout(simulateHighlight, delay);
+    };
+
     utterance.onstart = () => {
-      // Initialize to null to prevent displaying a zero-length sliver
       setSpokenWordRange({ msgIdx: idx, start: null, length: null });
+      // If voice is a cloud voice, it likely won't fire onboundary. So we simulate it.
+      if (voice && !voice.localService) {
+        simulateHighlight();
+      }
     };
 
     utterance.onboundary = (event) => {
+      // If the browser fires onboundary naturally, we use it (timer is either not started or we can clear it)
+      if (highlightTimerRef.current) {
+        clearTimeout(highlightTimerRef.current);
+        highlightTimerRef.current = null;
+      }
+      
       if (event.name === 'word' || event.name === 'sentence') {
         let length = event.charLength;
-        // Fix for Chrome/Edge bug where charLength is 0 or undefined for some voices
         if (!length || length === 0) {
           const remainingText = text.substring(event.charIndex);
-          // Match until the next space or punctuation, including Devanagari danda (।)
           const match = remainingText.match(/^[^\s.,!?।]+/);
           length = match ? match[0].length : 1;
         }
@@ -347,11 +379,13 @@ export default function Home() {
     };
 
     utterance.onend = () => {
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
       setPlayingMsgIdx(null);
       setIsPaused(false);
       setSpokenWordRange({ msgIdx: null, start: null, length: null });
     };
     utterance.onerror = () => {
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
       setPlayingMsgIdx(null);
       setIsPaused(false);
       setSpokenWordRange({ msgIdx: null, start: null, length: null });
@@ -361,6 +395,7 @@ export default function Home() {
   };
 
   const stopSpeaking = () => {
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
     window.speechSynthesis.cancel();
     setPlayingMsgIdx(null);
     setIsPaused(false);
