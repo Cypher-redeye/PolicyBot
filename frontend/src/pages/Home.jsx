@@ -328,12 +328,21 @@ export default function Home() {
     }
 
     utterance.onstart = () => {
-      setSpokenWordRange({ msgIdx: idx, start: 0, length: 0 });
+      // Initialize to null to prevent displaying a zero-length sliver
+      setSpokenWordRange({ msgIdx: idx, start: null, length: null });
     };
 
     utterance.onboundary = (event) => {
-      if (event.name === 'word') {
-        setSpokenWordRange({ msgIdx: idx, start: event.charIndex, length: event.charLength });
+      if (event.name === 'word' || event.name === 'sentence') {
+        let length = event.charLength;
+        // Fix for Chrome/Edge bug where charLength is 0 or undefined for some voices
+        if (!length || length === 0) {
+          const remainingText = text.substring(event.charIndex);
+          // Match until the next space or punctuation, including Devanagari danda (।)
+          const match = remainingText.match(/^[^\s.,!?।]+/);
+          length = match ? match[0].length : 1;
+        }
+        setSpokenWordRange({ msgIdx: idx, start: event.charIndex, length });
       }
     };
 
