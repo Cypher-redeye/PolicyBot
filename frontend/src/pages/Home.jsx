@@ -291,7 +291,28 @@ export default function Home() {
       'Punjabi': 'pa-IN',
       'English': 'en-US'
     };
-    const targetLang = langMap[currentLang] || 'en-US';
+    let targetLang = langMap[currentLang] || 'en-US';
+    
+    // Auto-detect script to handle previous chats correctly 
+    // where text might be in Hindi while current UI lang is English
+    if (/[\u0900-\u097F]/.test(text)) {
+      targetLang = 'hi-IN'; // Devanagari (Hindi/Marathi)
+    } else if (/[\u0B80-\u0BFF]/.test(text)) {
+      targetLang = 'ta-IN'; // Tamil
+    } else if (/[\u0C00-\u0C7F]/.test(text)) {
+      targetLang = 'te-IN'; // Telugu
+    } else if (/[\u0980-\u09FF]/.test(text)) {
+      targetLang = 'bn-IN'; // Bengali
+    } else if (/[\u0A80-\u0AFF]/.test(text)) {
+      targetLang = 'gu-IN'; // Gujarati
+    } else if (/[\u0C80-\u0CFF]/.test(text)) {
+      targetLang = 'kn-IN'; // Kannada
+    } else if (/[\u0D00-\u0D7F]/.test(text)) {
+      targetLang = 'ml-IN'; // Malayalam
+    } else if (/[\u0A00-\u0A7F]/.test(text)) {
+      targetLang = 'pa-IN'; // Punjabi
+    }
+
     utterance.lang = targetLang;
     
     const voice = getVoiceForLang(targetLang);
